@@ -21,7 +21,7 @@ async / sync socket framework
 
 * optional inactive connection checking (idle timeout, in seconds)
 
-* optional new connection callback to filter out unauthorized connection
+* optional new connection callback to filter out unauthorized connections
 
 * optional debug stack trace for aync calls
 
