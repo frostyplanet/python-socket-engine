@@ -6,15 +6,13 @@
 # @version $Id$
 # @ socket engine which support synchronized and asynchronized i/o , with replacable backend
 #
-# created on : 2011-07-19
-# last modify: 2012-08-17
 
 import traceback
 import socket
 import errno
 import threading
 import time
-from lib.mylist import MyList
+from mylist import MyList
 import sys
 import fcntl
 
@@ -88,6 +86,7 @@ class Connection (object):
 
 class SocketEngine (object):
 
+    sock = None
     _poll = None
     _lock = None
     _sock_dict = None
@@ -97,8 +96,10 @@ class SocketEngine (object):
     _last_checktimeout = None
     _checktimeout_inv = 0
     
-    def __init__ (self, poll, is_blocking=False, debug=True):
-        self.is_blocking = is_blocking
+    def __init__ (self, poll, is_blocking=True, debug=True):
+        """ 
+        sock:   sock to listen
+            """
         self._debug = debug
         self._sock_dict = dict ()
         self._locker = threading.Lock ()
@@ -109,8 +110,7 @@ class SocketEngine (object):
         self._pending_fd_ops = MyList () # (handler, conn)
         self._checktimeout_inv = 0
         self.get_time = time.time
-
-
+        self.is_blocking = is_blocking
 
     def set_timeout (self, rw_timeout, idle_timeout):
         self._rw_timeout = rw_timeout
@@ -123,6 +123,8 @@ class SocketEngine (object):
             temp_timeout.append (self._idle_timeout)
         if len(temp_timeout):
             self._checktimeout_inv = float (min (temp_timeout)) / 2
+        else:
+            self._checktimeout_inv = 0
 
     def set_logger (self, logger):
         self.logger = logger
@@ -207,12 +209,11 @@ class SocketEngine (object):
                     self.log_error ("cannot set FD_CLOEXEC on accepted socket fd, %s" % (str(e)))
 
                 if self.is_blocking:
-                    if self._rw_timeout:
-                        csock.settimeout (self._rw_timeout)
-                    else:
-                        csock.setblocking (1)
+                    csock.settimeout (self._rw_timeout or None)
                 else:
                     csock.setblocking (0)
+
+
                 if callable (new_conn_cb):
                     csock = new_conn_cb (csock, *readable_cb_args)
                     if not csock:
@@ -229,11 +230,7 @@ class SocketEngine (object):
 
     def listen (self, sock, readable_cb, readable_cb_args=(), 
             idle_timeout_cb=None, new_conn_cb=None, backlog=20):
-        """ 
-        readable_cb (connObj, *readable_cb_args):  callback when the socket can be read ;
-        idle_timeout_cb (connObj, *readable_cb_args):  if idle_timeout is set by set_timeout (), it will be called when a socket is inactive;
-        new_conn_cb (sock, *readable_cb_args): if it's not None, you can accept the connection by returning the socket object, or reject a connection by returning None;
-            """
+        """ readable_cb params:  (connObj, ) + readable_cb_args """
         assert isinstance (backlog, int)
         assert not readable_cb or callable (readable_cb)
         assert isinstance (readable_cb_args, tuple)
@@ -478,9 +475,9 @@ class SocketEngine (object):
             elif (conn.status == ConnState.TOREAD or conn.status == ConnState.TOWRITE) \
                     and self._rw_timeout > 0 and inact_time > self._rw_timeout:
                 return True
-            return False 
+            return False
         timeout_list = filter (__is_timeout, conns)
-        for conn in timeout_list: 
+        for conn in timeout_list:
             if conn.status == ConnState.IDLE:
                 if callable (conn.idle_timeout_cb):
                     conn.error = socket.timeout ("idle timeout")
@@ -489,6 +486,7 @@ class SocketEngine (object):
                 conn.error = socket.timeout ("timeout")
                 self._exec_callback (conn.unblock_err_cb, (conn,) + conn.unblock_cb_args, conn.unblock_tb)
             self._close_conn (conn)
+
 
     def _exec_callback (self, cb, args, stack=None):
         try:
@@ -537,6 +535,9 @@ class SocketEngine (object):
 class TCPSocketEngine (SocketEngine):
 
     bind_addr = None
+
+    def __init__ (self, poll, is_blocking=True, debug=False):
+        SocketEngine.__init__(self, poll, is_blocking=is_blocking, debug=debug)
 
     def listen_addr (self, addr, readable_cb, readable_cb_args=(), idle_timeout_cb=None, 
             new_conn_cb=None, backlog=10):
@@ -613,4 +614,5 @@ class TCPSocketEngine (SocketEngine):
             if callable(err_cb):
                 self._callback_indirect (err_cb, (ConnectNonblockError (res, err_msg), ) + cb_args, stack)
             return False
+
 
