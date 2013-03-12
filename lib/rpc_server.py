@@ -33,7 +33,6 @@ class InteractJob (Job):
             resp = RPC_Resp (rev, err)
             NetHead ().write_msg (conn.sock, resp.serialize ())
             self.server.engine.watch_conn (conn)
-            print "watch"
         except Exception, e:
             self.server.logger.exception ("peer %s, send response error: %s" % (conn.peer, str(e)))
             self.server.engine.close_conn (conn)
@@ -99,7 +98,6 @@ class SSL_RPC_Server (object):
         head = None
         try:
             head = NetHead.read_head (sock)
-            print "server read_head"
         except socket.error:
             self.engine.close_conn (conn)
             return
