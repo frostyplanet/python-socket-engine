@@ -9,6 +9,7 @@ from lib.rpc_server import SSL_RPC_Server
 from lib.log import Log
 import time
 import threading
+from lib.attr_wrapper import AttrWrapper
 
 import conf
 
@@ -18,7 +19,7 @@ SERVER_ADDR = ("127.0.0.1", 12346)
 def main ():
 
     def foo (arg1, arg2):
-        return (arg1, arg2)
+        return (arg1, arg2, {'dd': {'ee': 1}})
 
     def bar ():
         raise Exception ("orz")
@@ -46,6 +47,8 @@ def main ():
     client.connect (SERVER_ADDR)
     print "connected"
     ret = client.call ("foo", "aaa", arg2="bbb")
+    val = AttrWrapper.wrap (ret)
+    print "ret[2]['dd']['ee']", val[2].dd.ee
     print "foo => ret"
     try:
         client.call ("bar")

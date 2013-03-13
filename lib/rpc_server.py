@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # coding:utf-8
 
+
+# author: frostyplanet@gmail.com
+# rpc server in threaded-pool mode
+
 from socket_engine_ssl import SSLSocketEngine
 from job_queue import JobQueue, Job
 from rpc import RPC_ServerHandle, RPC_Req, RPC_Resp
@@ -8,6 +12,7 @@ from net_io import NetHead
 import io_poll
 import time
 import socket
+
 
 class InteractJob (Job):
         
