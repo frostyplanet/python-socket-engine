@@ -16,21 +16,23 @@ import conf
 SSL_CERT = os.path.join(os.path.dirname(__file__), '../private/server.pem')
 SERVER_ADDR = ("127.0.0.1", 12346)
 
-def main ():
-
-    def foo (arg1, arg2):
+class View ():
+    def foo (self, arg1, arg2):
         return (arg1, arg2, {'dd': {'ee': 1}})
 
-    def bar ():
+    def bar (self):
         raise Exception ("orz")
-        
+ 
+
+def main ():
+
+       
     server = SSL_RPC_Server (SSL_CERT, 
             SERVER_ADDR,
             Log ("server", config=conf),
             white_list=("127.0.0.1", ),
             )
-    server.add_handle (foo)
-    server.add_handle (bar)
+    server.add_view (View ())
     server.start (5)
     print "server started"
     def __run_server ():
