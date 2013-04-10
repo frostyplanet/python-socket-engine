@@ -33,13 +33,13 @@ class InteractJob (Job):
             self.server.logger.info ("peer %s, rpc call %s [%s]" % (conn.peer, str(self.req), end_ts - start_ts))
         except Exception, e:
             err = e
-            self.server.logger.exception ("peer %s, rpc call %s failed: %s" % (conn.peer, str(self.req), str(e)))
+            self.server.logger_err.exception ("peer %s, rpc call %s failed: %s" % (conn.peer, str(self.req), str(e)))
         try:
             resp = RPC_Resp (rev, err)
             NetHead ().write_msg (conn.sock, resp.serialize ())
             self.server.engine.watch_conn (conn)
         except Exception, e:
-            self.server.logger.exception ("peer %s, send response error: %s" % (conn.peer, str(e)))
+            self.server.logger_err.exception ("peer %s, send response error: %s" % (conn.peer, str(e)))
             self.server.engine.close_conn (conn)
 
 
@@ -47,8 +47,9 @@ class SSL_RPC_Server (object):
 
     logger = None
 
-    def __init__ (self, cert_file, addr, logger, timeout=10, idle_timeout=3600, white_list=()):
+    def __init__ (self, cert_file, addr, logger, err_logger=None, timeout=10, idle_timeout=3600, white_list=()):
         self.logger = logger
+        self.logger_err = err_logger or self.logger
         self.engine = SSLSocketEngine (io_poll.get_poll (), cert_file=cert_file, is_blocking=True)
         self.engine.set_logger (logger)
         self.engine.set_timeout (rw_timeout=timeout, idle_timeout=idle_timeout)
@@ -63,6 +64,16 @@ class SSL_RPC_Server (object):
 
     def add_handle (self, func):
         self.rpc_handles.add_handle (func)
+        self.logger.debug ("added handle: %s" % str(func))
+
+    def add_view (self, obj):
+        for name in dir(obj):
+            method = getattr (obj, name)
+            if callable (method) and hasattr (method, 'func_name'):
+                if method.func_name.find ("__") == 0:
+                    continue
+                self.add_handle (method)
+
 
     def start (self, worker_num):
         if self.is_running:
@@ -107,7 +118,7 @@ class SSL_RPC_Server (object):
             self.engine.close_conn (conn)
             return
         except Exception, e:
-            self.logger.exception (e)
+            self.logger_err.exception (e)
             self.engine.close_conn (conn)
             return
         try:
@@ -122,7 +133,7 @@ class SSL_RPC_Server (object):
             self.jobqueue.put_job (job)
             self.logger.info ("peer %s, new req %s enqueue" % (conn.peer, str(req)))
         except Exception, e:
-            self.logger.exception (e)
+            self.logger_err.exception (e)
             self.engine.close_conn (conn)
             return
 
