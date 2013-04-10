@@ -250,57 +250,57 @@ class TestReadTimeout (unittest.TestCase):
         else:
             self.fail (err)
 
-class TestWriteTimeout (unittest.TestCase):
-
-    server = None
-    client = None
-    print "init large buffer"
-    data = "".join (["0" for i in xrange (0, 100000000)])
-    server_addr = ("127.0.0.1", 12033)
-    hang_conn = None
-
-    def setUp (self):
-        self.server = SocketEngineTest (getLogger ("server"))
-        self.client = SocketEngineTest (getLogger ("client"))
-        self.client.start_client ()
-        print "[start]", str (self)
-
-    def testwrtimeout (self):
-        def __readable (conn):
-            self.hang_conn = conn
-            self.server.engine.remove_conn (conn)
-        self.server.start_server (self.server_addr, __readable)
-        self.server.engine.set_timeout (0, 0)
-        err = None
-        event = threading.Event ()
-        def __on_expected_error (conn):
-            print "expected error: " + str (conn.error)
-            event.set ()
-        def __on_write (conn):
-            self.client.engine.close_conn (conn)
-            err = "can believe the socket buffer is so large, you can try to increase the data size! "
-            event.set ()
-        def __on_conn_err (e, *args):
-            self.fail ("connect failed: "+ str(e))
-        def __on_conn (sock):
-            print "on connect"
-            self.client.engine.write_unblock (Connection (sock), self.data, __on_write, __on_expected_error)
-            return
-        self.client.engine.set_timeout (idle_timeout=0, rw_timeout=1)
-        self.client.engine.connect_unblock (self.server_addr, __on_conn, __on_conn_err)
-        event.wait ()
-        if not err:
-            print "* test write timeout OK"
-        else:
-            self.fail (err)
-
-    def tearDown (self):
-        if self.hang_conn:
-            self.hang_conn.close ()
-        if self.server:
-            self.server.stop ()
-        if self.client:
-            self.client.stop ()
+#class TestWriteTimeout (unittest.TestCase):
+#
+#    server = None
+#    client = None
+#    print "init large buffer"
+#    data = "".join (["0" for i in xrange (0, 100000000)])
+#    server_addr = ("127.0.0.1", 12033)
+#    hang_conn = None
+#
+#    def setUp (self):
+#        self.server = SocketEngineTest (getLogger ("server"))
+#        self.client = SocketEngineTest (getLogger ("client"))
+#        self.client.start_client ()
+#        print "[start]", str (self)
+#
+#    def testwrtimeout (self):
+#        def __readable (conn):
+#            self.hang_conn = conn
+#            self.server.engine.remove_conn (conn)
+#        self.server.start_server (self.server_addr, __readable)
+#        self.server.engine.set_timeout (0, 0)
+#        err = None
+#        event = threading.Event ()
+#        def __on_expected_error (conn):
+#            print "expected error: " + str (conn.error)
+#            event.set ()
+#        def __on_write (conn):
+#            self.client.engine.close_conn (conn)
+#            err = "can believe the socket buffer is so large, you can try to increase the data size! "
+#            event.set ()
+#        def __on_conn_err (e, *args):
+#            self.fail ("connect failed: "+ str(e))
+#        def __on_conn (sock):
+#            print "on connect"
+#            self.client.engine.write_unblock (Connection (sock), self.data, __on_write, __on_expected_error)
+#            return
+#        self.client.engine.set_timeout (idle_timeout=0, rw_timeout=1)
+#        self.client.engine.connect_unblock (self.server_addr, __on_conn, __on_conn_err)
+#        event.wait ()
+#        if not err:
+#            print "* test write timeout OK"
+#        else:
+#            self.fail (err)
+#
+#    def tearDown (self):
+#        if self.hang_conn:
+#            self.hang_conn.close ()
+#        if self.server:
+#            self.server.stop ()
+#        if self.client:
+#            self.client.stop ()
 
 class TestIdleTimeout (unittest.TestCase):
     server = None
