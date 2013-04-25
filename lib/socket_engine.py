@@ -525,7 +525,7 @@ class TCPSocketEngine (SocketEngine):
 
     bind_addr = None
 
-    def __init__ (self, poll, is_blocking=True, debug=False):
+    def __init__ (self, poll, is_blocking=True, debug=True):
         SocketEngine.__init__(self, poll, is_blocking=is_blocking, debug=debug)
 
     def listen_addr (self, addr, readable_cb, readable_cb_args=(), idle_timeout_cb=None, 

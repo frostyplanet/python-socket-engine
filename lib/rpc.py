@@ -7,6 +7,7 @@ from net_io import NetHead
 import socket
 import ssl
 import time
+from decimal import Decimal
 
 
 class RPC_Exception (Exception):
@@ -33,6 +34,12 @@ class RPC_Req (object):
             s += ", " + ", ".join (karr)
         s += " )"
         return s
+
+    @staticmethod
+    def _check_isbuiltin_type (v):
+        if v is not None and not isinstance (v, (int, float, basestring, dict, list, tuple, Decimal)):
+            raise RPC_Exception ("insecure request type %s" % (type(v)))
+
     
     @classmethod
     def deserialize (cls, buf):
@@ -48,19 +55,23 @@ class RPC_Req (object):
         if not isinstance (args, (tuple, list)) or not isinstance (k_args, dict):
             raise RPC_Exception ("invalid request format")
         for arg in args:
-            if not isinstance (arg, (int, float, basestring, dict, list, tuple)):
-                raise RPC_Exception ("insecure request")
+            cls._check_isbuiltin_type (arg)
         for k, arg in k_args.iteritems ():
-            if not isinstance (k, basestring) or \
-                    not isinstance (arg, (int, float, basestring, dict, list, tuple)):
-                raise RPC_Exception ("insecure request")
+            cls._check_isbuiltin_type (k)
+            cls._check_isbuiltin_type (arg)
         return cls (data[0], args, k_args)
 
 class RPC_Resp (object):
     
     def __init__ (self, retval, error):
         self.retval = retval
-        self.error = error and str(error) or None
+        if error is not None:
+            if str(error):
+                self.error = str(error)
+            else:
+                self.error = str(type(error))
+        else:
+            self.error = None
     
     def serialize (self):
         return pickle.dumps ((self.retval, self.error))
@@ -104,11 +115,13 @@ class SSL_RPC_Client (object):
 
     def __init__ (self, logger=None, ssl_version=ssl.PROTOCOL_SSLv3):
         self.connected = False
-        self.logger = None
+        self.logger = logger
         self.ssl_version = ssl_version
         self.timeout = 10
     
     def connect (self, addr):
+        if self.connected:
+            return
         self.sock = socket.socket (socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect (addr)
         self.sock = ssl.wrap_socket (self.sock, ssl_version=self.ssl_version)
@@ -123,29 +136,56 @@ class SSL_RPC_Client (object):
     def call (self, func_name, *args, **k_args):
         if not self.connected:
             raise RPC_Exception ("not connected")
-        start_ts = time.time ()
-        req = RPC_Req (func_name, args, k_args)
-        data = req.serialize()
-        head = NetHead ()
-        head.write_msg (self.sock, data)
-        resp = None
-        resp_head = NetHead.read_head (self.sock)
-        if not resp_head.body_len:
-            raise RPC_Exception ("rpc call %s, server-side return empty head" % (str(req)))
-        buf = resp_head.read_data (self.sock)
-        resp = RPC_Resp.deserialize (buf)
-        end_ts = time.time ()
-        timespan = end_ts - start_ts
-        if resp.error:
-            raise RPC_Exception ("rpc call %s return error: %s [%s sec]" % (str(req), str(resp.error), timespan))
-        if self.logger:
-            self.logger.info ("rpc call %s returned  [%s sec]" % (str(req), timespan))
-        return resp.retval
+        try:
+            start_ts = time.time ()
+            req = RPC_Req (func_name, args, k_args)
+            data = req.serialize()
+            head = NetHead ()
+            head.write_msg (self.sock, data)
+            resp = None
+            resp_head = NetHead.read_head (self.sock)
+            if not resp_head.body_len:
+                raise RPC_Exception ("rpc call %s, server-side return empty head" % (str(req)))
+            buf = resp_head.read_data (self.sock)
+            resp = RPC_Resp.deserialize (buf)
+            end_ts = time.time ()
+            timespan = end_ts - start_ts
+            if resp.error is not None:
+                raise RPC_Exception ("rpc call %s return error: %s [%s sec]" % (str(req), str(resp.error), timespan))
+            if self.logger:
+                self.logger.info ("rpc call %s returned  [%s sec]" % (str(req), timespan))
+            return resp.retval
+        except socket.error, e:
+            self.close ()
+            raise e
             
     def close (self):
-        self.sock.close ()
-        self.connected = False
+        if self.connected:
+            self.sock.close ()
+            self.connected = False
         
+class RPC_Pool (object):
+
+    def __init__ (self, cls, addr_list, logger):
+        self.logger = logger
+        self.rpc_list = [cls (logger) for i in addr_list]
+        self.addr_list = addr_list
+
+    def connect (self):
+        for i in xrange (len (self.addr_list)):
+            rpc = self.rpc_list[i]
+            try:
+                rpc.connect (self.addr_list[i])
+                self.cur_rpc = rpc
+                return rpc
+            except socket.error:
+                continue
+        raise RPC_Exception ("no server can be connected")
+
+    def disconnect (self):
+        for rpc in self.rpc_list:
+            rpc.close ()
+
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 :
