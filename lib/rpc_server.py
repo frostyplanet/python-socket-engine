@@ -80,7 +80,7 @@ class SSL_RPC_Server (object):
             return
         self.jobqueue.start_worker (worker_num)
         self.logger.info ("jq started")
-        self.inf_sock = self.engine.listen_addr (self.addr, readable_cb=self._server_handle, new_conn_cb=self._check_ip)
+        self.inf_sock = self.engine.listen_addr_ssl (self.addr, readable_cb=self._server_handle, new_conn_cb=self._check_ip)
         self.logger.info ("server started")
         self.is_running = True
 

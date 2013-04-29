@@ -237,7 +237,7 @@ class SocketEngine (object):
         return
 
     def listen (self, sock, readable_cb, readable_cb_args=(), 
-            idle_timeout_cb=None, new_conn_cb=None, backlog=20):
+            idle_timeout_cb=None, new_conn_cb=None, backlog=20, accept_cb=None):
         """ readable_cb params:  (connObj, ) + readable_cb_args """
         assert isinstance (backlog, int)
         assert not readable_cb or callable (readable_cb)
@@ -246,12 +246,14 @@ class SocketEngine (object):
         assert new_conn_cb is None or callable (new_conn_cb)
         assert sock and isinstance (sock, socket.SocketType)
         sock.setblocking (0) # set the main socket to nonblock
+        if not callable (accept_cb):
+            accept_cb = self._accept_conn
         try:
             flags = fcntl.fcntl(sock, fcntl.F_GETFD)
             fcntl.fcntl(sock, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
         except IOError, e:
             self.log_error ("cannot set FD_CLOEXEC on listening socket fd, %s" % (str(e)))
-        self._poll.register (sock.fileno (), 'r', self._accept_conn, 
+        self._poll.register (sock.fileno (), 'r', accept_cb, 
                 (sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb))
         sock.listen (backlog)
 

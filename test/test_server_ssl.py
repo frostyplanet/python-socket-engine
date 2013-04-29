@@ -33,7 +33,7 @@ g_done_client = 0
 
 #tc = TimeCache (0.5)
 
-def client_ssl ():
+def client_ssl (client_id):
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     global g_send_count, g_client_num, g_done_client, server_addr, global_lock
     global data
@@ -43,8 +43,8 @@ def client_ssl ():
 #        times = random.randint (1, 5000)
 #        time.sleep (times/ 2000.0)
     for i in xrange (0, round):
-        print i
         send_all (sock, data)
+        print "send", client_id, i, time.time()
         _data = recv_all (sock, len(data))
         if _data == data:
             global_lock.acquire ()
@@ -53,7 +53,7 @@ def client_ssl ():
         else:
             print "client recv invalid data"
 #            time.sleep (0.01)
-    print "client done", g_done_client
+    print "client done", client_id
     sock.close ()
     global_lock.acquire ()
     g_done_client += 1
@@ -84,12 +84,12 @@ def start_unblock_server_ssl ():
         server.remove_conn (conn)
         server.write_unblock (conn, conn.get_readbuf (), _on_send, _on_err)
         return
-    server.listen_addr (server_addr, server.read_unblock, (len(data), _on_recv, None))
+    server.listen_addr_ssl (server_addr, server.read_unblock, (len(data), _on_recv, None))
 
     def _run (_server):
         while True:
             try:
-                _server.poll ()
+                _server.poll (1)
             except Exception, e:
                 traceback.print_exc ()
                 os._exit (1)
@@ -109,7 +109,7 @@ def test_client ():
     while True:
         if i < g_client_num:
 #            ths.append (threading.Thread (target=client_pool, args=(pool, )))
-            ths.append (threading.Thread (target=client_ssl, args=()))
+            ths.append (threading.Thread (target=client_ssl, args=(i,)))
             ths[i].setDaemon(1)
             ths[i].start ()
             i += 1
@@ -156,12 +156,12 @@ def test_client_unblock ():
                 print "data recv invalid, client:", client, "data:", buf
                 os._exit (0)
         if count < round:
-            print "send", client_id, count + 1
+            print "send", client_id, count + 1, time.time ()
             engine.write_unblock (conn, data, __on_send, __on_err, (client_id, count + 1))
         else:
             engine.close_conn (conn)
             g_done_client += 1
-            print "client", client_id, "done"
+            print "client", client_id, "done", time.time()
             if g_done_client == g_client_num:
                 print "test client done time: ", time.time() - start_time
         return
@@ -169,14 +169,14 @@ def test_client_unblock ():
         engine.read_unblock (conn, len(data), __on_recv, __on_err, (client_id, count))
         return
     def __on_conn (sock, client_id):
-        print "ssl conn"
+        print "ssl conn", client_id, time.time ()
         __on_recv (Connection (sock), client_id, -1)
         return
     def _run (engine):
         global g_done_client
         while g_done_client < g_client_num:
             try:
-                engine.poll ()
+                engine.poll (1)
             except Exception, e:
                 traceback.print_exc ()
                 os._exit (1)

@@ -29,6 +29,8 @@ async / sync socket framework
 
     socket_engine.py  (framework)
 
+	socket_engine_ssl.py (SSL support)
+
     io_poll.py     (poll & epoll backends)
 
     mylist.py  (list wrapper)
@@ -52,6 +54,6 @@ async / sync socket framework
 
   See test/test_socketengine.py for functional test, and test/test_server.py for async / sync performance tests.
 
-  Syncronized model is about 2x faster than aync model,  due to footprint of callbacks. But async model is more cpu friendly with large numbers of connectins.
+  With sequenced 100k read & write, syncronized model is 10% faster than aync model,  due to footprint of async callbacks. But async model is capable of more throughput, and cpu friendly with large numbers of connectins.
 
 

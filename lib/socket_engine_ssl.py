@@ -15,6 +15,27 @@ class SSLSocketEngine (TCPSocketEngine):
         self.cert_file = cert_file
         self.ssl_version = ssl_version
 
+    def listen_addr_ssl (self, addr, readable_cb, readable_cb_args=(), idle_timeout_cb=None, 
+            new_conn_cb=None, backlog=10):
+
+        assert isinstance (addr, tuple) and len (addr) == 2
+        assert isinstance (addr[0], str) and isinstance (addr[1], int)
+        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.TCP_NODELAY, 1)
+        except socket.error, e:
+            self.log_error ("setting TCP_NODELAY " + str (e))
+        ip = socket.gethostbyname(addr[0])
+        port = addr[1]
+        sock.bind ((ip, port))
+        self.bind_addr = addr
+        self.listen (sock, readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
+                idle_timeout_cb=idle_timeout_cb,
+                new_conn_cb=new_conn_cb, backlog=backlog, accept_cb=self._accept_conn_ssl)
+        return sock
+
     def _do_handshake_server (self, csock, readable_cb, readable_cb_args, idle_timeout_cb):
         try:
             csock.do_handshake ()
@@ -62,9 +83,7 @@ class SSLSocketEngine (TCPSocketEngine):
                 err_cb (ConnectNonblockError (e), *cb_args)
 
 
-
-
-    def _accept_conn (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb):
+    def _accept_conn_ssl (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb):
         """ socket will set FD_CLOEXEC upon accepted """
         _accept = sock.accept
         while True: 
