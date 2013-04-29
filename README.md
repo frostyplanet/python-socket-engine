@@ -36,6 +36,10 @@ async / sync socket framework
 == Misc ==
 
     async_httphandler.py  (a BaseHTTPServer.py rewrite for async mode to implement a simple http server)
+    
+    job_queue.py  (thread-pool job workers)
+
+    rpc.py & rpc_server.py  (a thread-pool rpc server and client implementation using SSL)
 
     timecache.py  (cache to save for frequent time.time () calls )
 
