@@ -179,10 +179,10 @@ class SSLSocketEngine (TCPSocketEngine):
 
     def _do_unblock_write (self, conn, buf, ok_cb):
         """ return False to indicate need to reg conn into poll.
-            return True to indicate no more to read, can be suc or fail.
+            return True to indicate no more to write, can be suc or fail.
             """
-        if conn.status != ConnState.TOWRITE:
-            raise Exception ("you must have forgotten to watch_conn() or remove_conn()")
+#        if conn.status != ConnState.TOWRITE:
+#            raise Exception ("you must have forgotten to watch_conn() or remove_conn()")
         _len = len (buf)
         _send = conn.sock.send
         offset = conn.wr_offset
@@ -198,6 +198,7 @@ class SSLSocketEngine (TCPSocketEngine):
                     conn.wr_offset = offset
                     conn.last_ts = self.get_time ()
                     return False#return and wait for next trigger
+#                    continue
                 elif e[0] == errno.EINTR:
                     continue
                 conn.error = WriteNonblockError(e)

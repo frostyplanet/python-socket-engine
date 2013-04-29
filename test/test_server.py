@@ -15,14 +15,14 @@ import os
 import traceback
 #from lib.timecache import TimeCache
 
-data = "".join (["0" for i in xrange (0, 10000)])
+data = "".join (["0" for i in xrange (0, 100000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
-round = 5000
+round = 500
 
 g_send_count = 0
-g_client_num = 10
+g_client_num = 100
 g_done_client = 0
 
 #tc = TimeCache (0.5)
@@ -218,9 +218,11 @@ def test_client_unblock ():
                 print "test client done time: ", time.time() - start_time
         return
     def __on_send ( conn, client_id, count):
+#        print "send", client_id, count, time.time()
         engine.read_unblock (conn, len(data), __on_recv, __on_err, (client_id, count))
         return
     def __on_conn (sock, client_id):
+        print "conn", client_id, time.time()
         __on_recv (Connection (sock), client_id, -1)
         return
     def _run (engine):
@@ -235,6 +237,7 @@ def test_client_unblock ():
         return
     print "client_unblock started"
     for i in xrange (0, g_client_num):
+        print "conning", i
         engine.connect_unblock (server_addr, __on_conn, __on_conn_err, (i,))
     _run (engine)  
 
@@ -242,8 +245,8 @@ def test_client_unblock ():
 def main ():
     Log ("client", config=conf)
     Log ("server", config=conf)
-    server = start_unblock_server ()
-#    server = start_block_server ()
+#    server = start_unblock_server ()
+    server = start_block_server ()
     time.sleep (1)
 #    test_client ()
     test_client_unblock ()
