@@ -265,6 +265,24 @@ class TestWriteTimeout (unittest.TestCase):
         self.client.start_client ()
         print "[start]", str (self)
 
+    def testwr_poll (self):
+        self.server.engine.set_timeout (0, 0)
+        self.client.engine.set_timeout (0, 0)
+        self.server.start_server (self.server_addr, readable_cb=echo_server_non_block, readable_cb_args=(self.server.engine,))
+        def __on_write (conn):
+            p_data = self.client.engine._poll._handles.get (conn.sock.fileno ())
+            self.assert_ (not p_data[1])
+            self.assert_ (not conn.status_wr)
+            self.client.engine.close_conn (conn)
+        def __on_conn (sock):
+            print "on connect"
+            self.client.engine.write_unblock (Connection (sock), self.data, __on_write, __on_expected_error)
+            return
+        def __on_conn_err (e, *args):
+            self.fail ("connect failed: "+ str(e))
+        self.client.engine.connect_unblock (self.server_addr, __on_conn, __on_conn_err)
+
+
     def testwrtimeout (self):
         def __readable (conn):
             self.hang_conn = conn
