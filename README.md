@@ -54,6 +54,6 @@ async / sync socket framework
 
   See test/test_socketengine.py for functional test, and test/test_server.py for async / sync performance tests.
 
-  With sequenced 100k read & write, syncronized model is 10% faster than aync model,  due to footprint of async callbacks. But async model is capable of more throughput, and cpu friendly with large numbers of connectins.
+  With sequenced 100k read & write, async model is almost as fast a sync model, and async model is capable of more throughput, and cpu friendly with large numbers of connectins.
 
 

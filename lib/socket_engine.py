@@ -39,8 +39,6 @@ class Connection (object):
     sock = None
     status_rd = ConnState.EXTENDED_USING
     status_wr = None
-    peer = None
-    fd = None
     wr_offset = None
     rd_expect_len = None
     rd_buf = ""
@@ -62,6 +60,12 @@ class Connection (object):
         """ idle_timeout_cb will be callbacked with (engein, conn, *readable_cb_args)
         """
         self.sock = sock
+        self.fd = self.sock.fileno()
+        try:
+            self.peer = self.sock.getpeername ()
+        except socket.error:
+            pass
+
         if callable (readable_cb):
             self.readable_cb = readable_cb
             self.readable_cb_args = readable_cb_args or ()
@@ -69,11 +73,6 @@ class Connection (object):
             self.readable_cb = None
             self.readable_cb_args = ()
         self.idle_timeout_cb = callable (idle_timeout_cb) and idle_timeout_cb or None
-        try:
-            self.peer = sock.getpeername ()
-        except socket.error:
-            self.peer = None
-        self.fd = sock.fileno()
 
     def close (self):
         if self.status_rd != ConnState.CLOSED:
@@ -136,6 +135,7 @@ class SocketEngine (object):
             self._checktimeout_inv = 0
 
     def set_logger (self, logger):
+        assert logger
         self.logger = logger
 
     def log_error (self, msg):
@@ -361,9 +361,11 @@ class SocketEngine (object):
         """ return False to indicate need to reg conn into poll.
             return True to indicate no more to write, can be suc or fail.
             """
+        assert conn.status_wr
         _len = len (buf)
         _send = conn.sock.send
         offset = conn.wr_offset
+        count = 0
         while offset < _len:
             try:
                 res = _send (buffer (buf, offset))
@@ -373,7 +375,9 @@ class SocketEngine (object):
                 offset += res
             except self._error_exceptions, e:
                 if e[0] in self._eagain_errno:
-                    print "write"
+                    if count < 5:
+                        count += 1
+                        continue
                     conn.wr_offset = offset
                     conn.last_ts = self.get_time ()
                     return False#return and poll for next trigger
@@ -412,8 +416,11 @@ class SocketEngine (object):
         conn.rd_buf = ""
         conn.read_cb_args = cb_args
         conn.read_err_cb = err_cb
-        conn.read_tb = self._debug and traceback.extract_stack ()[0:-1] or None
+        conn.read_tb = None
+        conn.stack_count += 2
         if not self._do_unblock_read (conn, ok_cb):
+            if self._debug:
+                conn.read_tb = traceback.extract_stack ()[0:-1]
             conn.last_ts = self.get_time ()
             self._lock ()
             fd = conn.fd
@@ -438,8 +445,11 @@ class SocketEngine (object):
         conn.error = None
         conn.read_cb_args = cb_args
         conn.read_err_cb = err_cb
-        conn.read_tb = self._debug and traceback.extract_stack ()[0:-1] or None
+        conn.stack_count += 2
+        conn.read_tb = None
         if not self._do_unblock_readline (conn, ok_cb, max_len):
+            if self._debug:
+                conn.read_tb = traceback.extract_stack ()[0:-1]
             conn.last_ts = self.get_time ()
             self._lock ()
             fd = conn.fd
@@ -463,9 +473,11 @@ class SocketEngine (object):
         conn.error = None
         conn.write_err_cb = err_cb
         conn.write_cb_args = cb_args
-        if self._debug:
-            conn.write_tb = traceback.extract_stack ()[0:-1]
+        conn.stack_count += 2
+        conn.write_tb = None
         if not self._do_unblock_write (conn, buf, ok_cb):
+            if self._debug:
+                conn.write_tb = traceback.extract_stack ()[0:-1]
             conn.last_ts = self.get_time ()
             self._lock ()
             fd = conn.fd
@@ -512,7 +524,7 @@ class SocketEngine (object):
 
 
     def _exec_callback (self, cb, args, stack=None, count=0):
-        if count < 4:
+        if count < 5:
             try:
                 cb (*args)
             except Exception, e:
@@ -630,14 +642,14 @@ class TCPSocketEngine (SocketEngine):
                     self._exec_callback (err_cb, (ConnectNonblockError (res_code, err_msg),) +cb_args, stack)
             return
         if res == 0:
-            self._callback_indirect (ok_cb, (sock, ) + cb_args, stack)
+            self._exec_callback (ok_cb, (sock, ) + cb_args, stack)
         elif res == errno.EINPROGRESS:
             self._poll.register (fd, 'w', __on_connected, (sock, ))
         else:
             sock.close ()
             err_msg = errno.errorcode[res]
             if callable(err_cb):
-                self._callback_indirect (err_cb, (ConnectNonblockError (res, err_msg), ) + cb_args, stack)
+                self._exec_callback (err_cb, (ConnectNonblockError (res, err_msg), ) + cb_args, stack)
             return False
 
 
