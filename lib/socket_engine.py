@@ -530,7 +530,9 @@ class SocketEngine (object):
             self._cbs.append ((cb, args, stack))
 
     def poll (self, timeout=100):
-        """ you need to call this in a loop, return fd numbers polled each time """
+        """ you need to call this in a loop, return fd numbers polled each time,
+            timeout is in ms.
+        """
 
         #locking when poll may be prevent other thread to lock, but it's possible poll is not thread-safe, so we do the lazy approach
         __exec_callback = self._exec_callback

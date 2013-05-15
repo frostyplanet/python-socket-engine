@@ -111,7 +111,7 @@ if 'epoll' in dir(select):
         _out = select.EPOLLOUT
         _in_real = select.EPOLLIN | select.EPOLLRDBAND | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR
         _out_real = select.EPOLLOUT | select.EPOLLWRBAND | select.EPOLLHUP | select.EPOLLERR 
-        _timeout_scal = 1000.0
+        _timeout_scale = 1000.0
 
         def __init__ (self, is_edge=True):
             self.is_edge = is_edge
