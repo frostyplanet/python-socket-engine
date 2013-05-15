@@ -7,161 +7,126 @@ try:
     import epoll as select # python-epoll provide the same interface as select.poll, which unlike 2.6's select.epoll
 except ImportError:
     import select
-import threading
 import errno
-
-if 'epoll' in dir(select):
-
-    class EPoll (object):
-        """
-            NOTE: it runs on edge-trigger mode.
-            """
-
-        _handles = None
-        _poll = None
-
-
-        def __init__ (self, is_edge=False):
-            self.is_edge = is_edge
-#            self._locker = threading.Lock ()
-#            self._lock = self._locker.acquire
-#            self._unlock = self._locker.release
-            self._handles = dict ()
-            self._poll = select.epoll ()
-            self._find_handle = self._handles.get
-            _in = select.EPOLLIN
-            _out = select.EPOLLOUT
-#            _in_out = select.EPOLLIN | select.EPOLLOUT
-            if self.is_edge:
-                _in = select.EPOLLET | _in
-                _out = select.EPOLLET | _out
-#                _in_out = select.EPOLLET | _in_out
-            event_dict = {
-                'r': _in,
-                'w': _out,
-            }
-            self._get_ev = event_dict.__getitem__
-
-        def register (self, fd, event, handler, handler_args=()):
-            """ if event is 'rw', assume handler is readable callback, handler2 is writable callback
-            """
-            new_data = None
-            data = self._handles.get (fd)
-#            self._lock ()
-#            try:
-            if not data:
-                ev = self._get_ev (event)
-                assert ev != None
-                self._poll.register (fd, ev)
-            elif data[0] != event: # one call to register can be significant overhead
-                ev = self._get_ev (event)
-                assert ev != None
-                self._poll.modify (fd, ev)
-            handler_args = handler_args or ()
-            # event, func, args
-            self._handles[fd] = (event, handler, handler_args)
-#            finally:
-#                self._unlock ()
-
-        def unregister (self, fd):
-#            self._lock ()
-            try:
-                del self._handles[fd]
-                self._poll.unregister (fd)
-            except KeyError:
-                pass
-#            self._unlock ()
-
-        def poll (self, timeout):
-            """ 
-                timeout is in milliseconds in consitent with poll.
-                return function and arg to exec
-                """
-            _find_handle = self._find_handle
-#            _in = select.EPOLLIN | select.EPOLLPRI | select.EPOLLERR | select.EPOLLHUP
-#            _out = select.EPOLLOUT | select.EPOLLERR | select.EPOLLHUP
-            while True:
-                try:
-                    plist = self._poll.poll (timeout/ 1000.0) # fd, event
-#                    self._lock ()
-                    hlist = [_find_handle (x[0]) for x in plist]
-                    hlist = filter (lambda x:x, hlist)
-#                    self._unlock ()
-#                    for x in hlist:
-#                        if x:
-#                            x[1] (*x[2])
-                    return hlist
-                except select.error, e:
-                    if e[0] == errno.EINTR:
-                        continue
-                    raise e
-                
-
-
 
 class Poll (object):
     _handles = None
     _poll = None
-    event_dict = {
-        'r': select.POLLIN,
-        'w': select.POLLOUT,
-#        'rw': select.POLLIN | select.POLLOUT
-    }
+    _in = select.POLLIN
+    _out = select.POLLOUT
+    _in_real = select.POLLIN | select.POLLPRI | select.POLLERR | select.POLLHUP | select.POLLNVAL
+    _out_real = select.POLLOUT | select.POLLERR | select.POLLHUP | select.POLLNVAL
+    _timeout_scale = 1
 
     def __init__ (self, debug=False):
         self._handles = dict ()
         self.debug = debug
         self._poll = select.poll ()
-#        self._locker = threading.Lock ()
-#        self._lock = self._locker.acquire
-#        self._unlock = self._locker.release
-        self._find_handle = self._handles.get
-        self._get_ev = self.event_dict.__getitem__
 
     def register (self, fd, event, handler, handler_args=()):
-        """ if event is 'rw', assume handler is readable callback, handler2 is writable callback
-        """
-        data = self._handles.get (fd)
-#        self._lock ()
-#        try:
-        if not data or data[0] != event: # one call to register can be significant overhead
-            ev = self.event_dict.get (event)
-            assert ev != None
-            self._poll.register (fd, ev)
-        new_data = None
         handler_args = handler_args or ()
-        # event, func, args
-        self._handles[fd] = (event, handler, handler_args)
-#        finally:
-#            self._unlock ()
+        assert event in ['r', 'w']
+        data = self._handles.get (fd)
+        if not data:
+            if event == 'r':
+                self._handles[fd] = [(handler, handler_args, ), None]
+                self._poll.register (fd, self._in)
+            else: # w
+                self._handles[fd] = [None, (handler, handler_args, )]
+                self._poll.register (fd, self._out)
+        else: # one call to register can be significant overhead
+            if event == 'r':
+                if data[1]:
+                    self._poll.modify (fd, self._in | self._out)
+                data[0] = (handler, handler_args, )
+            else: # w
+                if data[0]:
+                    self._poll.modify (fd, self._in | self._out)
+                data[1] = (handler, handler_args, )
 
-    def unregister (self, fd):
-#        self._lock ()
+    def unregister (self, fd, event='r'):
+        assert event in ['r', 'w', 'rw', 'all']
+        data = self._handles.get (fd)
+        if not data:
+            return
+        if event == 'r':
+            if not data[0]:
+                return
+            if data[1]: # write remains
+                self._poll.modify (fd, self._out)
+                data[0] = None
+                return
+        elif event == 'w':
+            if not data[1]:
+                return
+            if data[0]:
+                self._poll.modify (fd, self._in)
+                data[1] = None
+                return
         try:
             del self._handles[fd]
             self._poll.unregister (fd)
         except KeyError:
             pass
-#        self._unlock ()
+
 
     def poll (self, timeout):
-        """ return function and arg to exec
+        """ 
+            timeout is in milliseconds in consitent with poll.
+            return [(function, arg), ...] to exec
             """
-        _find_handle = self._find_handle
-#        _in = select.POLLIN | select.POLLPRI | select.POLLHUP | select.POLLERR
-#        _out = select.POLLOUT | select.POLLHUP | select.POLLERR 
         while True:
             try:
-                plist = self._poll.poll (timeout) # fd, event
-#                self._lock ()
-                hlist = [_find_handle (x[0]) for x in plist]
-                hlist = filter (lambda x:x, hlist)
-#                self._unlock ()
+                plist = self._poll.poll (timeout/ self._timeout_scale) # fd, event
+                hlist = []
+                for fd, event in plist:
+                    data = self._handles.get (fd)
+                    if not data:
+                        raise Exception ("bug")
+                    else:
+                        if event & self._in_real:
+                            if data[0]:
+                                hlist.append (data[0])
+                            elif event & self._in:
+                                raise Exception ("bug")
+                        if event & self._out_real:
+                            if data[1]:
+                                hlist.append (data[1])
+                            elif event & self._out:
+                                raise Exception ("bug")
                 return hlist
             except select.error, e:
                 if e[0] == errno.EINTR:
                     continue
                 raise e
+
+
+
+if 'epoll' in dir(select):
+
+    class EPoll (Poll):
+        _handles = None
+        _poll = None
+        _in = select.EPOLLIN
+        _out = select.EPOLLOUT
+        _in_real = select.EPOLLIN | select.EPOLLRDBAND | select.EPOLLPRI | select.EPOLLHUP | select.EPOLLERR
+        _out_real = select.EPOLLOUT | select.EPOLLWRBAND | select.EPOLLHUP | select.EPOLLERR 
+        _timeout_scal = 1000.0
+
+        def __init__ (self, is_edge=True):
+            self.is_edge = is_edge
+            self._handles = dict ()
+            self._poll = select.epoll ()
+            if self.is_edge:
+                self._in = select.EPOLLET | select.EPOLLIN
+                self._out = select.EPOLLET | select.EPOLLOUT
+            else:
+                self._in = select.EPOLLIN
+                self._out = select.EPOLLOUT
+            
+
+               
+
                 
 
 def get_poll ():

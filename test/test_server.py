@@ -19,10 +19,10 @@ data = "".join (["0" for i in xrange (0, 100000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
-round = 500
+round = 5000
 
 g_send_count = 0
-g_client_num = 100
+g_client_num = 4
 g_done_client = 0
 
 #tc = TimeCache (0.5)
@@ -94,7 +94,7 @@ def start_block_server ():
         try:
             _data = recv_all (sock, len (data))
             send_all (sock, _data)
-#            server.watch_conn (conn)
+            server.watch_conn (conn)
         except Exception, e:
             print "server handler", str (e)
             getLogger ("server").exception (str (e))
@@ -130,14 +130,11 @@ def start_unblock_server ():
     server.set_logger (getLogger ("server"))
 #    server.get_time = tc.time
 
-    def _on_send (conn):
-        #print "on send"
-        server.watch_conn (conn)
-        return
     def _on_recv (conn):
         #print "on_recv"
-        server.remove_conn (conn)
-        server.write_unblock (conn, conn.get_readbuf (), _on_send, None)
+#        server.remove_conn (conn)
+        server.watch_conn (conn)
+        server.write_unblock (conn, conn.get_readbuf (), None, None)
         return
     server.listen_addr (server_addr, server.read_unblock, (len(data), _on_recv, None))
 
@@ -245,11 +242,11 @@ def test_client_unblock ():
 def main ():
     Log ("client", config=conf)
     Log ("server", config=conf)
-#    server = start_unblock_server ()
-    server = start_block_server ()
+    server = start_unblock_server ()
+#    server = start_block_server ()
     time.sleep (1)
-#    test_client ()
-    test_client_unblock ()
+    test_client ()
+#    test_client_unblock ()
 
 
 if __name__ == '__main__':

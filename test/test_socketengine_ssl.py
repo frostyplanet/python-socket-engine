@@ -66,7 +66,7 @@ class SSLSocketEngineTest (object):
         self.th.start ()
 
         self.server_addr = server_addr
-        self.server_sock = self.engine.listen_addr (server_addr, readable_cb=readable_cb, 
+        self.server_sock = self.engine.listen_addr_ssl (server_addr, readable_cb=readable_cb, 
                 readable_cb_args=readable_cb_args, 
                 idle_timeout_cb=idle_timeout_cb, 
                 new_conn_cb=new_conn_cb)
@@ -85,7 +85,7 @@ class SSLSocketEngineTest (object):
 ########### handler functions ############
 
 def __on_echo_server_error (conn, *args):
-    getLogger ("server").error (conn.error)
+    getLogger ("server").exception (conn.error)
 
 def echo_server_non_block (conn, engine):
 #    print "echo"
@@ -104,7 +104,7 @@ def echo_server_non_block (conn, engine):
             engine.watch_conn (conn)
         else:
 #            print "serverside close"
-            __on_echo_server_error (conn, e)
+            getLogger ("server").exception (e)
             engine.close_conn (conn)
     except Exception, e:
         print str(e)
@@ -140,7 +140,7 @@ class TestConnect (unittest.TestCase):
             print conn.error
             self.fail (conn.error)
         def __on_conn_err (e):
-            err = "conn" + str(conn.error)
+            err = "conn" + str(e)
             event.set ()
         def __on_read (conn):
             print "read"
@@ -174,7 +174,7 @@ class TestConnect (unittest.TestCase):
         def __on_conn_err (e):
             event.set ()
         def __on_conn (conn):
-            self.fail ("imposible")
+            self.fail ("impossible")
             engine.close_conn (conn)
         self.client.engine.connect_unblock_ssl (("127.0.0.1", 12025), __on_conn, __on_conn_err)
         event.wait ()
@@ -252,57 +252,57 @@ class TestReadTimeout (unittest.TestCase):
         else:
             self.fail (err)
 
-#class TestWriteTimeout (unittest.TestCase):
-#
-#    server = None
-#    client = None
-#    print "init large buffer"
-#    data = "".join (["0" for i in xrange (0, 100000000)])
-#    server_addr = ("127.0.0.1", 12033)
-#    hang_conn = None
-#
-#    def setUp (self):
-#        self.server = SSLSocketEngineTest (getLogger ("server"))
-#        self.client = SSLSocketEngineTest (getLogger ("client"))
-#        self.client.start_client ()
-#        print "[start]", str (self)
-#
-#    def testwrtimeout (self):
-#        def __readable (conn):
-#            self.hang_conn = conn
-#            self.server.engine.remove_conn (conn)
-#        self.server.start_server (self.server_addr, __readable)
-#        self.server.engine.set_timeout (0, 0)
-#        err = None
-#        event = threading.Event ()
-#        def __on_expected_error (conn):
-#            print "expected error: " + str (conn.error)
-#            event.set ()
-#        def __on_write (conn):
-#            self.client.engine.close_conn (conn)
-#            err = "can believe the socket buffer is so large, you can try to increase the data size! "
-#            event.set ()
-#        def __on_conn_err (e, *args):
-#            self.fail ("connect failed: "+ str(e))
-#        def __on_conn (sock):
-#            print "on connect"
-#            self.client.engine.write_unblock (Connection (sock), self.data, __on_write, __on_expected_error)
-#            return
-#        self.client.engine.set_timeout (idle_timeout=0, rw_timeout=1)
-#        self.client.engine.connect_unblock_ssl (self.server_addr, __on_conn, __on_conn_err)
-#        event.wait ()
-#        if not err:
-#            print "* test write timeout OK"
-#        else:
-#            self.fail (err)
-#
-#    def tearDown (self):
-#        if self.hang_conn:
-#            self.hang_conn.close ()
-#        if self.server:
-#            self.server.stop ()
-#        if self.client:
-#            self.client.stop ()
+class TestWriteTimeout (unittest.TestCase):
+
+    server = None
+    client = None
+    print "init large buffer"
+    data = "".join (["0" for i in xrange (0, 100000000)])
+    server_addr = ("127.0.0.1", 12033)
+    hang_conn = None
+
+    def setUp (self):
+        self.server = SSLSocketEngineTest (getLogger ("server"))
+        self.client = SSLSocketEngineTest (getLogger ("client"))
+        self.client.start_client ()
+        print "[start]", str (self)
+
+    def testwrtimeout (self):
+        def __readable (conn):
+            self.hang_conn = conn
+            self.server.engine.remove_conn (conn)
+        self.server.start_server (self.server_addr, __readable)
+        self.server.engine.set_timeout (0, 0)
+        err = None
+        event = threading.Event ()
+        def __on_expected_error (conn):
+            print "expected error: " + str (conn.error)
+            event.set ()
+        def __on_write (conn):
+            self.client.engine.close_conn (conn)
+            err = "can believe the socket buffer is so large, you can try to increase the data size! "
+            event.set ()
+        def __on_conn_err (e, *args):
+            self.fail ("connect failed: "+ str(e))
+        def __on_conn (sock):
+            print "on connect"
+            self.client.engine.write_unblock (Connection (sock), self.data, __on_write, __on_expected_error)
+            return
+        self.client.engine.set_timeout (idle_timeout=0, rw_timeout=1)
+        self.client.engine.connect_unblock_ssl (self.server_addr, __on_conn, __on_conn_err)
+        event.wait ()
+        if not err:
+            print "* test write timeout OK"
+        else:
+            self.fail (err)
+
+    def tearDown (self):
+        if self.hang_conn:
+            self.hang_conn.close ()
+        if self.server:
+            self.server.stop ()
+        if self.client:
+            self.client.stop ()
 
 class TestIdleTimeout (unittest.TestCase):
     server = None
