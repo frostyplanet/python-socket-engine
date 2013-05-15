@@ -9,7 +9,7 @@ async / sync socket framework
 
 * pure python, no third party cpython module is required. tested for python >= 2.3.4  
 
-* listen & unlisten for multiple socket for different use 
+* listen & unlisten for multiple socket for different protocol 
 
 * with replacable backends:  select.poll, select.epoll (python2.6+) or python-epoll.
 
@@ -56,4 +56,7 @@ async / sync socket framework
 
   With sequenced 100k read & write, async model is almost as fast a sync model, and async model is capable of more throughput, and cpu friendly with large numbers of connectins.
 
+== Related projects depends on this framework ==
+
+https://github.com/frostyplanet/transwarp
 
