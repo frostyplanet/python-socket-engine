@@ -5,11 +5,12 @@ by frostyplanet at gmail.com
 
 async / sync socket framework
 
-== Features ==
+Features
+__________
 
 * pure python, no third party cpython module is required. tested for python >= 2.3.4  
 
-* listen & unlisten for multiple socket for different use 
+* listen & unlisten for multiple socket for different protocol 
 
 * with replacable backends:  select.poll, select.epoll (python2.6+) or python-epoll.
 
@@ -25,7 +26,8 @@ async / sync socket framework
 
 * optional debug stack trace for aync calls
 
-== Core components ==
+Core components
+----------------
 
     socket_engine.py  (framework)
 
@@ -35,7 +37,8 @@ async / sync socket framework
 
     mylist.py  (list wrapper)
 
-== Misc ==
+Misc
+----------------
 
     async_httphandler.py  (a BaseHTTPServer.py rewrite for async mode to implement a simple http server)
     
@@ -48,7 +51,8 @@ async / sync socket framework
     net_io.py (fixed length header for socket interaction, and safe recvall() & sendall() )
 
 
-== Testing ==
+Testing
+----------------
 
   Onced tested and optimised in 3k+ connection with 2k+ QPS production environment. More tests will be appreciated.
 
@@ -56,4 +60,9 @@ async / sync socket framework
 
   With sequenced 100k read & write, async model is almost as fast a sync model, and async model is capable of more throughput, and cpu friendly with large numbers of connectins.
 
+
+Related projects depend on this framework
+----------------
+
+https://github.com/frostyplanet/transwarp
 
