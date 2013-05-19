@@ -19,7 +19,7 @@ data = "".join (["0" for i in xrange (0, 100000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
-round = 5000
+g_round = 50000
 
 g_send_count = 0
 g_client_num = 4
@@ -33,11 +33,11 @@ def client ():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     global g_send_count, g_client_num, g_done_client, server_addr, global_lock
     global data
-    global round
+    global g_round
     sock.connect (server_addr)
 #        times = random.randint (1, 5000)
 #        time.sleep (times/ 2000.0)
-    for i in xrange (0, round):
+    for i in xrange (0, g_round):
         send_all (sock, data)
         _data = recv_all (sock, len(data))
         if _data == data:
@@ -56,10 +56,10 @@ def client ():
 def client_pool (pool):
     global g_send_count, g_client_num, g_done_client, server_addr, global_lock
     global data
-    global round
+    global g_round
     conn = None
     try:
-        for i in xrange (0, round):
+        for i in xrange (0, g_round):
             conn = pool.get_conn (server_addr)
             if conn == None:
                 print "get_conn failed"
@@ -203,9 +203,11 @@ def test_client_unblock ():
         if count >= 0:
             buf = conn.get_readbuf ()
             if buf != data:
-                print "data recv invalid, client:", client, "data:", buf
+                print "data recv invalid, client:%s, count:%s, data:[%s]" % (client_id, count, buf)
                 os._exit (0)
-        if count < round:
+        if count < g_round:
+            #print client_id, count
+            #engine.remove_conn (conn)
             engine.write_unblock (conn, data, __on_send, __on_err, (client_id, count + 1))
         else:
             engine.close_conn (conn)
@@ -213,9 +215,11 @@ def test_client_unblock ():
             print "client", client_id, "done"
             if g_done_client == g_client_num:
                 print "test client done time: ", time.time() - start_time
+                os._exit (0)
         return
     def __on_send ( conn, client_id, count):
 #        print "send", client_id, count, time.time()
+        #print "send", client_id
         engine.read_unblock (conn, len(data), __on_recv, __on_err, (client_id, count))
         return
     def __on_conn (sock, client_id):
