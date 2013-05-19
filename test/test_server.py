@@ -246,11 +246,11 @@ def test_client_unblock ():
 def main ():
     Log ("client", config=conf)
     Log ("server", config=conf)
-    server = start_unblock_server ()
-#    server = start_block_server ()
+#    server = start_unblock_server ()
+    server = start_block_server ()
     time.sleep (1)
-    test_client ()
-#    test_client_unblock ()
+#    test_client ()
+    test_client_unblock ()
 
 
 if __name__ == '__main__':
