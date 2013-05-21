@@ -65,16 +65,21 @@ localhost performance testing in test/test_server.py:
 testing parameters:
 
 each client: 100k data send & recv x 50000 round;
+
 blocking-mode client: 4 client in 4 thread;
+
 unblock-mode client:  4 client multiplex in 1 thread;
+
 blocking-mode server & unblock-mode server both using 1 thread;
 
 result:
 
 blocking-mode client, unblock-mode server,  time: 18.5491240025
+
 blocking-mode clinet, blocking-mode server, time: 19.9843790531
 
 unblock-mode client, unblocking-mode server, time: 25.2030720711
+
 unblock-mode client, block-mode server, time:  26.1123259068
 
 Related projects depend on this framework
