@@ -476,7 +476,7 @@ class SocketEngine (object):
         conn.read_err_cb = err_cb
         conn.stack_count += 2
         conn.read_tb = None
-        if not self._do_unblock_readline (conn, ok_cb, max_len, direct=True):
+        if self._do_unblock_readline (conn, ok_cb, max_len, direct=True):
             self._conn_callback (conn, conn.error is None and ok_cb or conn.read_err_cb, (conn, ) + conn.read_cb_args, count=2)
         
     def write_unblock (self, conn, buf, ok_cb, err_cb=None, cb_args=()):

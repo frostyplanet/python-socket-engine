@@ -15,7 +15,7 @@ import os
 import traceback
 #from lib.timecache import TimeCache
 
-data = "".join (["0" for i in xrange (0, 100000)])
+data = "".join (["1234567890" for i in xrange (0, 10000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
@@ -246,11 +246,11 @@ def test_client_unblock ():
 def main ():
     Log ("client", config=conf)
     Log ("server", config=conf)
-#    server = start_unblock_server ()
-    server = start_block_server ()
+    server = start_unblock_server ()
+#    server = start_block_server ()
     time.sleep (1)
-#    test_client ()
-    test_client_unblock ()
+    test_client ()
+#    test_client_unblock ()
 
 
 if __name__ == '__main__':

@@ -3,18 +3,18 @@ python-socket-engine
 
 by frostyplanet at gmail.com
 
-async / sync socket framework
+async / sync socket framework based on callbacks
 
 Features
 __________
 
 * pure python, no third party cpython module is required. tested for python >= 2.3.4  
 
-* listen & unlisten for multiple socket for different protocol 
+* listen multiple port for different callbacks
 
 * with replacable backends:  select.poll, select.epoll (python2.6+) or python-epoll.
 
-* read_unblock, write_unblock, readline_unblock, connect_unblock is implemented for aync nonblocking mode.
+* (fix-len)read_unblock, (fix-len)write_unblock, readline_unblock, connect_unblock is implemented for aync nonblocking mode.
 
 * GIL friendly, so you can use it to create your threaded server or threaded-pool server as you want
 
@@ -26,6 +26,14 @@ __________
 
 * optional debug stack trace for aync calls
 
+
+Compared to other framework
+----------------------------
+Before I started this project, I need to write a app to be deployed on thousands machines (running different linux distros and some without internet access),
+high parallel network i/o is desired, and better be pure python to minimize deployment effort. While Gevent needs compile c extensions, and asyncore in python lib 
+lacks a lot of functionality (there is no fix-len unblocking send/recv, no timeout, etc), so I decided to write it myself. It's event triggered, connect/read/write operation has ok/error callbacks. you can organize the code in closures or functions with suitable arguments.
+
+
 Core components
 ----------------
 
@@ -35,9 +43,7 @@ Core components
 
     io_poll.py     (poll & epoll backends)
 
-    mylist.py  (list wrapper)
-
-Misc
+Extensions & Helper & misc
 ----------------
 
     async_httphandler.py  (a BaseHTTPServer.py rewrite for async mode to implement a simple http server)
@@ -64,7 +70,8 @@ localhost performance testing in test/test_server.py:
   	
 testing parameters:
 
-each client: 100k data send & recv x 50000 round;
+intel i3-2310M (HT off)
+each client: 100k sequenced send & recv x 50000 round;
 blocking-mode client: 4 client in 4 thread;
 unblock-mode client:  4 client multiplex in 1 thread;
 blocking-mode server & unblock-mode server both using 1 thread;
