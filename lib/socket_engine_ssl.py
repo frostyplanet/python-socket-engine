@@ -18,7 +18,7 @@ class SSLSocketEngine (TCPSocketEngine):
         self._error_exceptions = (socket.error, ssl.SSLError, )
 
     def listen_addr_ssl (self, addr, readable_cb, readable_cb_args=(), idle_timeout_cb=None, 
-            new_conn_cb=None, backlog=10):
+            new_conn_cb=None, backlog=10, is_blocking=None):
 
         assert isinstance (addr, tuple) and len (addr) == 2
         assert isinstance (addr[0], str) and isinstance (addr[1], int)
@@ -35,14 +35,16 @@ class SSLSocketEngine (TCPSocketEngine):
         self.bind_addr = addr
         self.listen (sock, readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
                 idle_timeout_cb=idle_timeout_cb,
-                new_conn_cb=new_conn_cb, backlog=backlog, accept_cb=self._accept_conn_ssl)
+                new_conn_cb=new_conn_cb, backlog=backlog, accept_cb=self._accept_conn_ssl, is_blocking=is_blocking)
         return sock
 
-    def _do_handshake_server (self, csock, readable_cb, readable_cb_args, idle_timeout_cb):
+    def _do_handshake_server (self, csock, readable_cb, readable_cb_args, idle_timeout_cb, is_blocking=None):
         try:
             csock.do_handshake ()
             #TODO: cleanup stalked socket fds during handshake
-            if self.is_blocking:
+            if is_blocking is None:
+                is_blocking = self.is_blocking
+            if is_blocking:
                 csock.setblocking (1)  # from non block to block
             self._put_sock (csock, readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
                     idle_timeout_cb=idle_timeout_cb, stack=False, lock=False)
@@ -50,10 +52,10 @@ class SSLSocketEngine (TCPSocketEngine):
         except (ssl.SSLError), e:
             if e.args[0] == ssl.SSL_ERROR_WANT_READ:
                 self._poll.register (csock.fileno (), 'r', self._do_handshake_server, (csock, readable_cb, readable_cb_args, 
-                    idle_timeout_cb))
+                    idle_timeout_cb, is_blocking))
             elif e.args[0] == ssl.SSL_ERROR_WANT_WRITE:
                 self._poll.register (csock.fileno (), 'w', self._do_handshake_server, (csock, readable_cb, readable_cb_args,
-                    idle_timeout_cb))
+                    idle_timeout_cb, is_blocking))
             else:
                 self.log_error ("peer (%s) do_handshake exception %s, %s" % (csock.getpeername(), type(e), str(e)))
                 csock.close ()
@@ -87,7 +89,7 @@ class SSLSocketEngine (TCPSocketEngine):
                 err_cb (ConnectNonblockError (e), *cb_args)
 
 
-    def _accept_conn_ssl (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb):
+    def _accept_conn_ssl (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb, is_blocking=None):
         """ socket will set FD_CLOEXEC upon accepted """
         _accept = sock.accept
         while True: 
@@ -107,8 +109,7 @@ class SSLSocketEngine (TCPSocketEngine):
                         continue
                 csock = ssl.wrap_socket (csock, certfile=self.cert_file, server_side=True, ssl_version=self.ssl_version,
                         do_handshake_on_connect=False)
-                
-                self._do_handshake_server (csock, readable_cb, readable_cb_args, idle_timeout_cb)
+                self._do_handshake_server (csock, readable_cb, readable_cb_args, idle_timeout_cb, is_blocking=is_blocking)
             except (socket.error, ssl.SSLError), e:
                 if e[0] in self._eagain_errno:
                     return #no more
