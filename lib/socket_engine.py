@@ -330,8 +330,8 @@ class SocketEngine (object):
                     break
                 buf += _buf
                 maxlen -= _l
-            except socket.error, e:
-                if e.args[0] == errno.EAGAIN:
+            except self._error_exceptions, e:
+                if e.args[0] == self._eagain_errno:
                     break
                 elif e.args[0] == errno.EINTR:
                     continue
