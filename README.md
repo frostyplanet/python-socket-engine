@@ -26,6 +26,7 @@ __________
 
 * optional debug stack trace for aync calls
 
+* readahead buffer using epoll edge-trigger mode
 
 Compared to other framework
 ----------------------------
@@ -82,16 +83,20 @@ blocking-mode server & unblock-mode server both using 1 thread;
 
 result:
 
-blocking-mode client, unblock-mode server,  time: 18.5491240025 (v0.9), 17.7592840195 (v1)
+blocking-mode client, unblock-mode server,  time: 18.5491240025 (v0.9), 17.9542291164 (v1)
 
-blocking-mode clinet, blocking-mode server, time: 19.9843790531 (v0.9), 19.042662859 (v1)
+blocking-mode clinet, blocking-mode server, time: 19.9843790531 (v0.9), 18.6820361614 (v1)
 
-unblock-mode client, unblocking-mode server, time: 25.2030720711 (v0.9), 24.6424481869 (v1)
+unblock-mode client, unblocking-mode server, time: 25.2030720711 (v0.9)
 
 unblock-mode client, block-mode server, time:  26.1123259068 (v0.9), 23.7259261608 (v1)
 
-Related projects depend on this framework
+Examples
 ----------------
 
+Async mode: private socks5 tunnel :
 https://github.com/frostyplanet/transwarp
 
+
+Sync mode threaded-pool:
+rpc_server.py & test/test_rpc.py in this repo

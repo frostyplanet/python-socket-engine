@@ -80,7 +80,6 @@ class Connection (object):
             self.status_rd = ConnState.CLOSED
             if self.sock:
                 self.sock.close ()
-                self.sock = None
 
     def is_open (self):
         return self.status_rd != ConnState.CLOSED
@@ -176,13 +175,13 @@ class SocketEngine (object):
         if thread.get_ident () == self._poll_tid:
             if not self.is_blocking:
                 res = conn.rd_ahead_buf or conn.error is not None
-                if not res:
-                    try:
-                        conn.rd_ahead_buf += conn.sock.recv (1)
-                        res = True
-                    except socket.error, e:
-                        if e[0] not in self._eagain_errno:
-                            res = True
+#                if not res:
+#                    try:
+#                        conn.rd_ahead_buf += conn.sock.recv (1)
+#                        res = True
+#                    except socket.error, e:
+#                        if e[0] not in self._eagain_errno:
+#                            res = True
                 if res:
                     if conn.error is None:
                         self._poll.replace_read (conn.fd, self._read_ahead, (conn, ))
@@ -301,24 +300,22 @@ class SocketEngine (object):
         self._poll.unregister (sock.fileno (), 'r')
         sock.close ()
 
-    def _read_ahead (self, conn, no_limit=False):
+    def _read_ahead (self, conn, maxlen=0):
         if conn.error is not None:
             return True
-        if no_limit:
-            maxlen = self.READAHEAD_LEN
-        else:
+        if maxlen == 0:
             maxlen = self.READAHEAD_LEN - len (conn.rd_ahead_buf)
-            if maxlen <= 0:
-                print "max reach"
-                try:
-                    self._poll.unregister (conn.fd)
-                except socket.error:
-                    pass
-                return
+        if maxlen <= 0:
+            print "max reach"
+            try:
+                self._poll.unregister (conn.fd)
+            except socket.error:
+                pass
+            return
         _recv = conn.sock.recv
         buf = conn.rd_ahead_buf
         eof = False
-        while no_limit or maxlen:
+        while maxlen:
             try:
                 _buf = _recv (maxlen)
                 _l = len(_buf)
@@ -326,8 +323,7 @@ class SocketEngine (object):
                     eof = True
                     break
                 buf += _buf
-                if not no_limit:
-                    maxlen -= _l
+                maxlen -= _l
             except socket.error, e:
                 if e.args[0] == errno.EAGAIN:
                     break
@@ -350,13 +346,18 @@ class SocketEngine (object):
         _recv = conn.sock.recv
         while expect_len:
             try:
-                temp = _recv (expect_len)
+                temp = _recv (expect_len + 1)
                 _len = len (temp)
                 if not _len:
                     conn.error = ReadNonBlockError (0, "peer close")
                     break
-                expect_len -= _len
-                buf += temp
+                if _len > expect_len: # always read more to support epoll ET mode, put the rest into read ahead buffer
+                    buf += temp[0:expect_len]
+                    conn.rd_ahead_buf += temp[expect_len:]
+                    expect_len = 0
+                else:
+                    expect_len -= _len
+                    buf += temp
             except self._error_exceptions, e:
                 if e[0] in self._eagain_errno: 
                     conn.rd_buf = buf
@@ -376,63 +377,55 @@ class SocketEngine (object):
         conn.rd_buf = buf
         conn.status_rd = ConnState.USING
         conn.last_ts = self.get_time ()
-        # assuming no multi-thread operation,
-        # as I don't want to unregister the read event without knowing whether subsequence read will be happening and cause overhead,
-        # if socket is readable, we read ahead and store the data
         if direct:
             return True
+        # now we are done here, and seems read event is registered,
+        # as I don't want to unregister the read event without knowing whether subsequence read will be happening and cause overhead,
+        # replace the read event with _read_ahead () 
         if conn.error is None:
             self._poll.replace_read (conn.fd, self._read_ahead, (conn, ))
-        self._conn_callback (conn, conn.error is None and ok_cb or conn.read_err_cb, (conn, ) + conn.read_cb_args, stack=conn.read_tb)
+            self._conn_callback (conn, ok_cb, (conn, ) + conn.read_cb_args, stack=conn.read_tb)
+        else:
+            self._conn_callback (conn, conn.read_err_cb, (conn, ) + conn.read_cb_args, stack=conn.read_tb)
 
 
     def _do_unblock_readline (self, conn, ok_cb, max_len, direct=False):
         """ return False to indicate need to reg conn into poll.
             return True to indicate no more to read, can be suc or fail.
             """
-        if conn.status_rd != ConnState.TOREAD:
-            # assuming no multi-thread operation,
-            # as I don't want to unregister the read event without knowing whether subsequence read will be happening and case overhead,
-            # and user may forget to remove_conn() by themselves, cause read event is trigger after the previous read was done,
-            # so we do this lazy approach
-            self._poll.unregister (conn.fd, 'r')
-            return
-        buf = conn.rd_buf
-        _recv = conn.sock.recv
-        while True:
-            try:
-                temp = _recv (1)
-                if temp == '':
-                    conn.error = ReadNonBlockError (0, "peer close")
-                    break
-                buf += temp
-                if temp == '\n':
-                    break
-                if len(buf) > max_len:
-                    conn.error = ReadNonBlockError (0, "line maxlength exceed")
-                    break
-            except self._error_exceptions, e:
-                if e[0] in self._eagain_errno: 
-                    conn.rd_buf = buf
+        eof = self._read_ahead (conn, max_len)
+        pos = conn.rd_ahead_buf.find ('\n')
+        conn.last_ts = self.get_time ()
+        if pos < 0:
+            if len (conn.rd_ahead_buf) > max_len:
+                conn.error = ReadNonBlockError (0, "line maxlength exceed")
+            elif conn.error is None:
+                if not eof:
                     if self._debug and not conn.read_tb:
                         conn.read_tb = traceback.extract_stack ()[0:-1]
-                    conn.last_ts = self.get_time ()
                     conn.stack_count = 0
-#                    self._lock ()
                     self._sock_dict[conn.fd] = conn
                     self._poll.register (conn.fd, 'r', self._do_unblock_readline, (conn, ok_cb, max_len))
-#                    self._unlock ()
-                    return False#return and wait for next trigger
-                elif e[0] == errno.EINTR:
-                    continue
-                conn.error = ReadNonBlockError (e)
-                break
-        conn.rd_buf = buf
+                    return False
+                else:
+                    conn.error = ReadNonBlockError (0, "peer close")
+        else:
+            conn.rd_buf = conn.rd_ahead_buf[0:pos+1]
+            conn.rd_ahead_buf = conn.rd_ahead_buf[pos+1:]
         conn.status_rd = ConnState.USING
-        conn.last_ts = self.get_time ()
+        if conn.error is None and not conn.rd_ahead_buf:
+            try:
+                conn.rd_ahead_buf += conn.sock.recv (1)
+            except self._error_exceptions:
+                pass
         if direct:
             return True
-        self._conn_callback (conn, conn.error is None and ok_cb or conn.read_err_cb, (conn, ) + conn.read_cb_args, stack=conn.read_tb)
+        if conn.error is None:
+            self._poll.replace_read (conn.fd, self._read_ahead, (conn, ))
+            self._conn_callback (conn, ok_cb, (conn, ) + conn.read_cb_args, stack=conn.read_tb)
+        else:
+            self._conn_callback (conn, conn.read_err_cb, (conn, ) + conn.read_cb_args, stack=conn.read_tb)
+
 
 
     def _do_unblock_write (self, conn, buf, ok_cb, direct=False):
@@ -479,9 +472,9 @@ class SocketEngine (object):
         self._poll.unregister (conn.fd, 'w')
         self._conn_callback (conn, conn.error is None and ok_cb or conn.write_err_cb, (conn, ) + conn.write_cb_args, stack=conn.write_tb)
 
-    def read_avail (self, conn):
+    def read_avail (self, conn, max_len=0):
         """ eof is true when peer closed """
-        eof = self._read_ahead (conn, no_limit=True)
+        eof = self._read_ahead (conn, max_len)
         buf = conn.rd_ahead_buf
         conn.rd_ahead_buf = ""
         return buf, eof
@@ -660,7 +653,6 @@ class SocketEngine (object):
                 __exec_callback (*cb)
         if self._checktimeout_inv > 0 and time.time() - self._last_checktimeout > self._checktimeout_inv:
             self._check_timeout ()
-        return len (hlist)
 
 
 class TCPSocketEngine (SocketEngine):
