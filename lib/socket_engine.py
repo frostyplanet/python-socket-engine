@@ -417,7 +417,7 @@ class SocketEngine (object):
         conn.status_rd = ConnState.USING
         if conn.error is None and not conn.rd_ahead_buf:
             try:
-                conn.rd_ahead_buf += conn.sock.recv (1)
+                conn.rd_ahead_buf += conn.sock.recv (1024)
             except self._error_exceptions:
                 pass
         if direct:
@@ -479,6 +479,12 @@ class SocketEngine (object):
         eof = self._read_ahead (conn, max_len)
         buf = conn.rd_ahead_buf
         conn.rd_ahead_buf = ""
+        if not eof and conn.error is None:
+            try:
+                conn.rd_ahead_buf += conn.sock.recv (1024)
+            except self._error_exceptions:
+                pass
+            self._poll.replace_read (conn.fd, self._read_ahead, (conn, ))
         return buf, eof
 
 
