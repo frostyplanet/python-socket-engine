@@ -247,7 +247,7 @@ class SocketEngine (object):
             self._unlock ()
 
 
-    def _accept_conn (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb):
+    def _accept_conn (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb, is_blocking=False):
         """ socket will set FD_CLOEXEC upon accepted """
         _accept = sock.accept
         _put_sock = self._put_sock
@@ -260,8 +260,7 @@ class SocketEngine (object):
                     fcntl.fcntl(csock, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
                 except IOError, e:
                     self.log_error ("cannot set FD_CLOEXEC on accepted socket fd, %s" % (str(e)))
-
-                if self.is_blocking:
+                if is_blocking:
                     csock.settimeout (self._rw_timeout or None)
                 else:
                     csock.setblocking (0)
@@ -281,7 +280,7 @@ class SocketEngine (object):
         return
 
     def listen (self, sock, readable_cb, readable_cb_args=(), 
-            idle_timeout_cb=None, new_conn_cb=None, backlog=20, accept_cb=None):
+            idle_timeout_cb=None, new_conn_cb=None, backlog=20, accept_cb=None, is_blocking=None):
         """ readable_cb params:  (connObj, ) + readable_cb_args """
         assert isinstance (backlog, int)
         assert not readable_cb or callable (readable_cb)
@@ -289,6 +288,8 @@ class SocketEngine (object):
         assert idle_timeout_cb is None or callable (idle_timeout_cb)
         assert new_conn_cb is None or callable (new_conn_cb)
         assert sock and isinstance (sock, socket.SocketType)
+        if is_blocking is None:
+            is_blocking = self.is_blocking
         sock.setblocking (0) # set the main socket to nonblock
         if not callable (accept_cb):
             accept_cb = self._accept_conn
@@ -298,7 +299,7 @@ class SocketEngine (object):
         except IOError, e:
             self.log_error ("cannot set FD_CLOEXEC on listening socket fd, %s" % (str(e)))
         self._poll.register (sock.fileno (), 'r', accept_cb, 
-                (sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb))
+                (sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb, is_blocking))
         sock.listen (backlog)
 
     def unlisten (self, sock):
@@ -422,7 +423,7 @@ class SocketEngine (object):
         conn.status_rd = ConnState.USING
         if conn.error is None and not conn.rd_ahead_buf:
             try:
-                conn.rd_ahead_buf += conn.sock.recv (1024)
+                conn.rd_ahead_buf += conn.sock.recv (1)
             except self._error_exceptions:
                 pass
         if direct:
@@ -676,7 +677,7 @@ class TCPSocketEngine (SocketEngine):
         SocketEngine.__init__(self, poll, is_blocking=is_blocking, debug=debug)
 
     def listen_addr (self, addr, readable_cb, readable_cb_args=(), idle_timeout_cb=None, 
-            new_conn_cb=None, backlog=10):
+            new_conn_cb=None, backlog=10, is_blocking=None):
 
         assert isinstance (addr, tuple) and len (addr) == 2
         assert isinstance (addr[0], str) and isinstance (addr[1], int)
@@ -693,7 +694,7 @@ class TCPSocketEngine (SocketEngine):
         self.bind_addr = addr
         self.listen (sock, readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
                 idle_timeout_cb=idle_timeout_cb,
-                new_conn_cb=new_conn_cb, backlog=backlog)
+                new_conn_cb=new_conn_cb, backlog=backlog, is_blocking=is_blocking)
         return sock
 
     def connect_unblock (self, addr, ok_cb, err_cb=None, cb_args=(), syn_retry=None):

@@ -189,7 +189,7 @@ class HTTPHandler (baseHTTPHandler):
         })
 
 def start_http_server (logger, ip, port):
-    engine = TCPSocketEngine (iopoll.Poll ())
+    engine = TCPSocketEngine (iopoll.EPoll ())
     engine.set_logger (logger)
     engine.set_timeout (idle_timeout=0, rw_timeout=5)
     handler = HTTPHandler (engine, logger)
@@ -198,7 +198,7 @@ def start_http_server (logger, ip, port):
         print "server started"
         while True:
             try:
-                engine.poll (1)
+                engine.poll ()
             except Exception, e:
                 traceback.print_exc ()
                 os._exit (1)

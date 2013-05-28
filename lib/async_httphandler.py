@@ -109,7 +109,7 @@ class baseHTTPHandler (object):
         self.passive_sock = None
 
     def start (self, addr):
-        self.passive_sock = self.engine.listen_addr (addr, readable_cb=None, new_conn_cb=self._accept_client)
+        self.passive_sock = self.engine.listen_addr (addr, readable_cb=None, new_conn_cb=self._accept_client, is_blocking=False)
 
     def stop (self):
         if self.passive_sock:
