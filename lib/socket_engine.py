@@ -339,8 +339,8 @@ class SocketEngine (object):
         """ return False to indicate need to reg conn into poll.
             return True to indicate no more to read, can be suc or fail.
             """
-#        if conn.status_rd != ConnState.TOREAD:
-#            raise Exception ("not possible")
+        if conn.status_rd != ConnState.TOREAD:
+            raise Exception ("not possible")
         expect_len = conn.rd_expect_len
         buf = conn.rd_buf
         _recv = conn.sock.recv
@@ -393,6 +393,8 @@ class SocketEngine (object):
         """ return False to indicate need to reg conn into poll.
             return True to indicate no more to read, can be suc or fail.
             """
+        if conn.status_rd != ConnState.TOREAD:
+            raise Exception ("not possible")
         eof = self._read_ahead (conn, max_len)
         pos = conn.rd_ahead_buf.find ('\n')
         conn.last_ts = self.get_time ()
@@ -640,10 +642,6 @@ class SocketEngine (object):
             self._unlock ()
             for _cb in fd_ops:
                 _cb[0](_cb[1])
-
-        hlist = self._poll.poll (timeout)
-        for h in hlist:
-            __exec_callback (h[0], h[1])
         if self._cbs:
             self._lock ()
             cbs = self._cbs
@@ -651,6 +649,10 @@ class SocketEngine (object):
             self._unlock ()
             for cb in cbs:
                 __exec_callback (*cb)
+        else:
+            hlist = self._poll.poll (timeout)
+            for h in hlist:
+                __exec_callback (h[0], h[1])
         if self._checktimeout_inv > 0 and time.time() - self._last_checktimeout > self._checktimeout_inv:
             self._check_timeout ()
 
