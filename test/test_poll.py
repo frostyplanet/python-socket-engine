@@ -79,6 +79,8 @@ class TestPoll (unittest.TestCase):
         self._exec_cbs (poll.poll (1))
         self.assert_ (ev1.is_set ())
         self.assert_ (ev2.is_set ())
+        self.assertEqual (os.read (rd, 1), '')
+        self.assertEqual (os.read (rd, 1), '')
         os.close (rd)
 
 

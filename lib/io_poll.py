@@ -44,6 +44,14 @@ class Poll (object):
                     self._poll.modify (fd, self._in | self._out)
                 data[1] = (handler, handler_args, )
 
+    def replace_read (self, fd, handler, handler_args=()):
+        """ if read handler is register before, replace it """
+        handler_args = handler_args or ()
+        data = self._handles.get (fd)
+        if data and data[0]:
+            data[0] = (handler, handler_args, )
+        
+
     def unregister (self, fd, event='r'):
         assert event in ['r', 'w', 'rw', 'all']
         data = self._handles.get (fd)
