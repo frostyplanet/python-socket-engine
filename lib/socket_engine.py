@@ -25,6 +25,11 @@ class WriteNonblockError (socket.error):
 class ReadNonBlockError (socket.error):
     pass
 
+class PeerCloseError (ReadNonBlockError):
+    
+    def __init__ (self, *args):
+        ReadNonBlockError.__init__ (self, 0, "peer close")
+
 
 class ConnState (object):
     USING = 'u'
@@ -349,7 +354,7 @@ class SocketEngine (object):
                 temp = _recv (expect_len + 1)
                 _len = len (temp)
                 if not _len:
-                    conn.error = ReadNonBlockError (0, "peer close")
+                    conn.error = PeerCloseError ()
                     break
                 if _len > expect_len: # always read more to support epoll ET mode, put the rest into read ahead buffer
                     buf += temp[0:expect_len]
@@ -410,7 +415,7 @@ class SocketEngine (object):
                     self._poll.register (conn.fd, 'r', self._do_unblock_readline, (conn, ok_cb, max_len))
                     return False
                 else:
-                    conn.error = ReadNonBlockError (0, "peer close")
+                    conn.error = PeerCloseError ()
         else:
             conn.rd_buf = conn.rd_ahead_buf[0:pos+1]
             conn.rd_ahead_buf = conn.rd_ahead_buf[pos+1:]
