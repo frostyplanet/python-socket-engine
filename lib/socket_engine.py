@@ -65,6 +65,7 @@ class Connection (object):
         """ idle_timeout_cb will be callbacked with (engein, conn, *readable_cb_args)
         """
         self.sock = sock
+        self.is_blocking = (sock.gettimeout () != 0)
         self.fd = self.sock.fileno()
         self.rd_ahead_buf = ""
         try:
@@ -178,7 +179,7 @@ class SocketEngine (object):
         if not callable (conn.readable_cb):
             return
         if thread.get_ident () == self._poll_tid:
-            if not self.is_blocking:
+            if not conn.is_blocking:
                 res = conn.rd_ahead_buf or conn.error is not None
 #                if not res:
 #                    try:
@@ -197,7 +198,7 @@ class SocketEngine (object):
                 conn.last_ts = self.get_time ()
                 conn.status_rd = ConnState.IDLE
                 conn.stack_count = 0
-                if self.is_blocking:
+                if conn.is_blocking:
                     self._poll.register (conn.fd, 'r', conn.readable_cb, (conn, ) + conn.readable_cb_args)
                 else:
                     self._poll.register (conn.fd, 'r', self._unblock_readable, (conn, ))
@@ -331,7 +332,7 @@ class SocketEngine (object):
                 buf += _buf
                 maxlen -= _l
             except self._error_exceptions, e:
-                if e.args[0] == self._eagain_errno:
+                if e.args[0] in self._eagain_errno:
                     break
                 elif e.args[0] == errno.EINTR:
                     continue
@@ -420,6 +421,7 @@ class SocketEngine (object):
         else:
             conn.rd_buf = conn.rd_ahead_buf[0:pos+1]
             conn.rd_ahead_buf = conn.rd_ahead_buf[pos+1:]
+
         conn.status_rd = ConnState.USING
         if conn.error is None and not conn.rd_ahead_buf:
             try:
