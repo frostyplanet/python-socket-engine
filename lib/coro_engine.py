@@ -214,7 +214,9 @@ class CoroEngine ():
 
         # Maps child coroutines to joining (exit-waiting) parents.
         self.joiners = collections.defaultdict(list)
-        self._waitables = []  # TODO  process WaitableEvent
+
+#        self._waitables = []  # TODO  process WaitableEvent
+        self._unknown_waitables = dict ()
 
     def complete_thread(self, coro, return_value):
         """Remove a coroutine from the scheduling pool, awaking
@@ -253,7 +255,7 @@ class CoroEngine ():
                 # explicit bluelet.call().)
                 next_event = DelegationEvent(next_event)
             elif isinstance(next_event, WaitableEvent):
-                self._waitables.append (next_event)
+#                self._waitables.append (next_event)
                 self.event2coro[next_event] = coro
 
             self.threads[coro] = next_event
@@ -263,18 +265,22 @@ class CoroEngine ():
             self.complete_thread(coro, None)
         except:
             # Thread raised some other exception.
-            del self.threads[coro]
-            te = ThreadException(coro, sys.exc_info())
-            event = ExceptionEvent(te.exc_info)
-            if te.coro in self.delegators:
-                # The thread is a delegate. Raise exception in its
-                # delegator.
-                self.threads[self.delegators[te.coro]] = event
-                del self.delegators[te.coro]
-            else:
-                # The thread is root-level. Raise in client code.
-                te.reraise()
- 
+            self.handle_exception (coro)
+
+
+    def handle_exception (coro):
+        del self.threads[coro]
+        te = ThreadException(coro, sys.exc_info())
+        event = ExceptionEvent(te.exc_info)
+        if te.coro in self.delegators:
+            # The thread is a delegate. Raise exception in its
+            # delegator.
+            self.threads[self.delegators[te.coro]] = event
+            del self.delegators[te.coro]
+        else:
+            # The thread is root-level. Raise in client code.
+            te.reraise()
+
             
     def kill_thread(self, coro):
         """Unschedule this thread and its (recursive) delegates.
@@ -297,7 +303,10 @@ class CoroEngine ():
 
     def resume_from_waitable (self, event):
         # Run the IO operation, but catch socket errors.
-        coro = self.event2coro[event]
+        coro = self.event2coro.get (event)
+        if not coro:
+            self._unknown_waitables[event] = None
+            return
         try:
             value = event.fire()
         except socket.error as exc:
@@ -306,14 +315,17 @@ class CoroEngine ():
                 # Broken pipe. Remote host disconnected.
                 pass
             else:
-                traceback.print_exc()   #TODO ???
-
+                self.handle_exception(coro)
+                return
+                #traceback.print_exc()   #TODO ???
+        except:
+            self.handle_exception(coro)
             # Abort the coroutine.
-            del self.event2coro[event]
-            self.threads[coro] = ReturnEvent(None)
-        else:
-            del self.event2coro[event]
-            self.advance_thread(coro, value)
+#            del self.event2coro[event]
+#            self.threads[coro] = ReturnEvent(None)
+            return
+        del self.event2coro[event]
+        self.advance_thread(coro, value)
 
 
     def poll (self):
@@ -324,7 +336,7 @@ class CoroEngine ():
         # running immediate events until nothing is ready.
         while True:
             have_ready = False
-            print self.threads.items()
+
             for coro, event in list(self.threads.items()):
                 if isinstance(event, SpawnEvent):
                     self.threads[event.spawned] = ValueEvent(None)  # Spawn.
@@ -355,6 +367,9 @@ class CoroEngine ():
                     have_ready = True
                 elif isinstance(event, WaitableEvent):
                     self.event2coro[event] = coro
+                    if self._unknown_waitables.has_key (event):
+                        self.resume_from_waitable (event)
+                        del self._unknown_waitables[event]
 
             # Only start the select when nothing else is ready.
             if not have_ready:

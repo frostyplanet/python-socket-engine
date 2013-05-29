@@ -81,11 +81,14 @@ class Connection (object):
             self.readable_cb_args = ()
         self.idle_timeout_cb = callable (idle_timeout_cb) and idle_timeout_cb or None
 
-    def close (self):
+    def _close (self):
         if self.status_rd != ConnState.CLOSED:
             self.status_rd = ConnState.CLOSED
             if self.sock:
                 self.sock.close ()
+        return
+
+    close = _close
 
     def is_open (self):
         return self.status_rd != ConnState.CLOSED
@@ -162,9 +165,6 @@ class SocketEngine ():
 
     def put_sock (self, sock, readable_cb, readable_cb_args=(), idle_timeout_cb=None, stack=True):
         """  setup readable / idle callbacks for a passive socket, and watch for events, return Connection object """
-        return self._put_sock (sock, readable_cb, readable_cb_args, idle_timeout_cb, lock=True)
-
-    def _put_sock (self, sock, readable_cb, readable_cb_args=(), idle_timeout_cb=None, stack=True, lock=False):
         conn = Connection (sock,
                 readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
                 idle_timeout_cb=idle_timeout_cb)
@@ -244,7 +244,7 @@ class SocketEngine ():
                 del self._sock_dict[fd]
             except KeyError:
                 pass
-            conn.close ()
+            conn._close ()
         else:
             self._lock ()
             self._pending_fd_ops.append ((self.close_conn, conn))
@@ -254,7 +254,7 @@ class SocketEngine ():
     def _accept_conn (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb, is_blocking=False):
         """ socket will set FD_CLOEXEC upon accepted """
         _accept = sock.accept
-        _put_sock = self._put_sock
+        _put_sock = self.put_sock
         while True: 
         # have to make sure the socket is non-block, so we can accept multiple connection
             try:
@@ -600,7 +600,7 @@ class SocketEngine ():
             if conn.status_rd == ConnState.IDLE and self._idle_timeout > 0 and inact_time > self._idle_timeout:
                 if callable (conn.idle_timeout_cb):
                     conn.error = socket.timeout ("idle timeout")
-                    conn.idle_timeout_cb (conn, *conn.readable_cb_args)
+                    self._exec_callback (conn.idle_timeout_cb, (conn,) + conn.readable_cb_args)
                 self.close_conn (conn)
             elif conn.status_rd == ConnState.TOREAD and self._rw_timeout > 0 and inact_time > self._rw_timeout:
                 if callable(conn.read_err_cb):
