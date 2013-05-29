@@ -118,18 +118,18 @@ def start_block_server ():
     return server
     
 
-def start_unblock_server ():
+def start_unblock_server (poll=None):
     global server_addr
-    poll = None
-    if 'EPoll' in dir(iopoll):
-        poll = iopoll.EPoll (True)
-        print "using epoll et mode"
-    else:
-        poll = iopoll.Poll ()
+    if not poll:
+        if 'EPoll' in dir(iopoll):
+            poll = iopoll.EPoll (True)
+        else:
+            poll = iopoll.Poll ()
     server = TCPSocketEngine (poll, is_blocking=False, debug=False)
     server.set_logger (getLogger ("server"))
 #    server.get_time = tc.time
-
+    
+    print "starting unblock server with", str(poll)
     def _on_recv (conn):
         #print "on_recv"
 #        server.remove_conn (conn)

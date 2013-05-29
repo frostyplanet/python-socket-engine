@@ -227,7 +227,7 @@ class SocketEngine (object):
             if self._sock_dict.has_key (fd):
                 del self._sock_dict[fd]
                 try:
-                    self._poll.unregister (fd, 'r')
+                    self._poll.unregister (fd, 'r')  # NOTE: the event is to be reconsider with libev
                 except Exception, e:
                     self.logger.exception ("peer %s: %s" % (conn.peer, str(e)))
         else:
@@ -323,7 +323,7 @@ class SocketEngine (object):
         if maxlen <= 0:
             print "max reach"
             try:
-                self._poll.unregister (conn.fd)
+                self._poll.unregister (conn.fd, 'r')
             except socket.error:
                 pass
             return
