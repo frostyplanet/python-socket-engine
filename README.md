@@ -12,7 +12,7 @@ __________
 
 * listen multiple port for different callbacks
 
-* with replacable backends:  select.poll, select.epoll (python2.6+) or python-epoll.
+* with replacable backends:  select.poll, select.epoll (python2.6+) or python-epoll or pyev.
 
 * (fix-len)read_unblock, (fix-len)write_unblock, readline_unblock, connect_unblock is implemented for aync nonblocking mode.
 
@@ -42,7 +42,7 @@ Core components
 
 	socket_engine_ssl.py (SSL support)
 
-    io_poll.py     (poll & epoll backends)
+    io_poll.py     (poll & epoll & pyev backends)
 
 Extensions & Helper & misc
 ----------------
