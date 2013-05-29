@@ -96,7 +96,7 @@ class Connection (object):
         return self.rd_buf
 
 
-class SocketEngine (object):
+class SocketEngine ():
 
     sock = None
     _poll = None

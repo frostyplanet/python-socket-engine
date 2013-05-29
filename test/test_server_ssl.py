@@ -4,7 +4,8 @@
 
 import _env
 import conf
-from lib.socket_engine_ssl import SSLSocketEngine, Connection
+from lib.socket_engine import TCPSocketEngine
+from lib.socket_engine_ssl import SSLSocketEngine, Connection, inject_ssl_method
 from lib.net_io import send_all, recv_all, NetHead
 import socket
 import threading
@@ -68,7 +69,10 @@ def start_unblock_server_ssl ():
         print "using epoll et mode"
     else:
         poll = iopoll.Poll ()
-    server = SSLSocketEngine (poll, SSL_CERT, is_blocking=False, debug=True)
+    #server = SSLSocketEngine (poll, SSL_CERT, is_blocking=False, debug=True)
+    server = TCPSocketEngine (poll, is_blocking=False, debug=True)
+    inject_ssl_method (server, SSL_CERT)
+
     server.set_logger (getLogger ("server"))
 #    server.get_time = tc.time
 
