@@ -57,7 +57,7 @@ def _do_handshake_server (self, csock, readable_cb, readable_cb_args, idle_timeo
         if is_blocking:
             csock.setblocking (1)  # from non block to block
         self.put_sock (csock, readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
-                idle_timeout_cb=idle_timeout_cb, stack=False, lock=False)
+                idle_timeout_cb=idle_timeout_cb, stack=False)
         return
     except (ssl.SSLError), e:
         if e.args[0] == ssl.SSL_ERROR_WANT_READ:

@@ -211,6 +211,7 @@ class CoroEngine ():
         self.threads = {}
         # Maps child coroutines to delegating parents.
         self.delegators = {}
+        self.event2coro = {}
 
         # Maps child coroutines to joining (exit-waiting) parents.
         self.joiners = collections.defaultdict(list)
@@ -268,7 +269,7 @@ class CoroEngine ():
             self.handle_exception (coro)
 
 
-    def handle_exception (coro):
+    def handle_exception (self, coro):
         del self.threads[coro]
         te = ThreadException(coro, sys.exc_info())
         event = ExceptionEvent(te.exc_info)

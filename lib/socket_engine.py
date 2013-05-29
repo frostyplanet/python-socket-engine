@@ -86,6 +86,7 @@ class Connection (object):
             self.status_rd = ConnState.CLOSED
             if self.sock:
                 self.sock.close ()
+        print "close"
         return
 
     close = _close
@@ -216,7 +217,7 @@ class SocketEngine ():
     def _unblock_readable (self, conn):
         if conn.error is None:
             self._poll.replace_read (conn.fd, self._read_ahead, (conn, ))
-        conn.readable_cb (conn, *conn.readable_cb_args)
+        self._exec_callback (conn.readable_cb, (conn,) + conn.readable_cb_args)
 
 
     def remove_conn (self, conn):
@@ -274,7 +275,7 @@ class SocketEngine ():
                     if not csock:
                         continue
                 _put_sock (csock, readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
-                        idle_timeout_cb=idle_timeout_cb, stack=False, lock=False)
+                        idle_timeout_cb=idle_timeout_cb, stack=False)
             except socket.error, e:
                 if e[0] == errno.EAGAIN:
                     return #no more

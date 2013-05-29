@@ -2,7 +2,7 @@
 # coding:utf-8
 
 
-from socket_egine import Connection, ReadNonBlockError, WriteNonblockError, PeerCloseError
+from socket_engine import Connection, ReadNonBlockError, WriteNonblockError, PeerCloseError, TCPSocketEngine
 from coro_engine import CoroEngine, WaitableEvent
 import traceback
 import socket
@@ -12,10 +12,11 @@ import thread
 import time
 import sys
 import fcntl
+import types
 
 class EngineEvent (WaitableEvent):
 
-    def __init__ ():
+    def __init__ (self):
         self.ret = None
         self.error = None
 
@@ -41,16 +42,19 @@ class CoroConnection(Connection):
 
     def read (self, expect_len):
         event = EngineEvent ()
-        yield event and self.engine.read_unblock (self, expect_len, self._read_cb, self._read_cb, cb_args=(event,))
+        self.engine.read_unblock (self, expect_len, self._read_cb, self._read_cb, cb_args=(event,))
+        return event
 
     def write (self, buf):
         event = EngineEvent ()
         event.ret = len(buf)
-        yield event and self.engine.write_unblock (self, expect_len, self._write_cb, self._write_cb, cb_args=(event, ))
+        self.engine.write_unblock (self, buf, self._write_cb, self._write_cb, cb_args=(event, ))
+        return event
 
     def readline (self, maxlen):
         event = EngineEvent ()
-        yield event and self.engine.readline_unblock (self, maxlen, self._read_cb, self._read_cb, cb_args=(event,))
+        self.engine.readline_unblock (self, maxlen, self._read_cb, self._read_cb, cb_args=(event,))
+        return event
 
     def _close (self):
         Connection.close (self)
@@ -92,6 +96,7 @@ class CoroSocketEngine (TCPSocketEngine):
             r = cb (*args)
             if r and isinstance (r, types.GeneratorType):
                 self.coroengine.run_coro (r)
+                self.coroengine.poll ()
         else:
             conn.stack_count = 0
             self._lock ()
@@ -104,6 +109,7 @@ class CoroSocketEngine (TCPSocketEngine):
             r = cb (*args)
             if r and isinstance (r, types.GeneratorType):
                 self.coroengine.run_coro (r)
+                self.coroengine.poll ()
         except Exception, e:
             msg = "uncaught %s exception in %s %s:%s" % (type(e), str(cb), str(args), str(e))
             if stack:
@@ -170,8 +176,8 @@ class CoroSocketEngine (TCPSocketEngine):
 
     def connect_coro (self, addr, event, syn_retry=None):
         event = EngineEvent ()
-        connect_unblock (self, addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
-        yield event
+        self.connect_unblock (self, addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
+        return event
 
 
 
