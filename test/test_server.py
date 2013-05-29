@@ -175,7 +175,6 @@ def test_client ():
 
             if g_client_num == g_done_client:
                 print "test OK"
-                os._exit (0)
             else:
                 print "test fail"
             return

@@ -161,6 +161,7 @@ class SocketEngine (object):
             print e
 
     def put_sock (self, sock, readable_cb, readable_cb_args=(), idle_timeout_cb=None, stack=True):
+        """  setup readable / idle callbacks for a passive socket, and watch for events, return Connection object """
         return self._put_sock (sock, readable_cb, readable_cb_args, idle_timeout_cb, lock=True)
 
     def _put_sock (self, sock, readable_cb, readable_cb_args=(), idle_timeout_cb=None, stack=True, lock=False):
@@ -174,7 +175,9 @@ class SocketEngine (object):
 
 
     def watch_conn (self, conn):
-        """ assume conn is already manage by server, register into poll """
+        """ register a Connection object and watch for readable event,
+            if the socket is readable/error,  readable_cb will be called.
+        """
         assert isinstance (conn, Connection)
         if not callable (conn.readable_cb):
             return
@@ -217,7 +220,7 @@ class SocketEngine (object):
 
 
     def remove_conn (self, conn):
-        """ remove connection from server and poll """
+        """ remove Connection from server, unregister all read events """
         if thread.get_ident () == self._poll_tid:
             conn.status_rd = ConnState.EXTENDED_USING
             fd = conn.fd
@@ -233,7 +236,7 @@ class SocketEngine (object):
             self._unlock ()
 
     def close_conn (self, conn):
-        """ remove an close connection """
+        """ remove and close connection """
         if thread.get_ident () == self._poll_tid:
             fd = conn.fd
             self._poll.unregister (fd, 'all')
@@ -282,7 +285,12 @@ class SocketEngine (object):
 
     def listen (self, sock, readable_cb, readable_cb_args=(), 
             idle_timeout_cb=None, new_conn_cb=None, backlog=20, accept_cb=None, is_blocking=None):
-        """ readable_cb params:  (connObj, ) + readable_cb_args """
+        """ readable_cb :  (connObj, ) + readable_cb_args,
+            new_conn_cb :  (socket)    # intercept a new connection socket, you may do authorization checking or handshake protocol, 
+                    new_conn_cb returns True to tell the socketengine to perform put_sock(), or returns False to tell socketengine to ignore
+            accept_cb:  override the default _accept_cb(), may used by derived classes
+            is_blocking:   tell _accept_cb() to set the new socket to blocking mode or non-blocking mode 
+        """
         assert isinstance (backlog, int)
         assert not readable_cb or callable (readable_cb)
         assert isinstance (readable_cb_args, tuple)
@@ -483,7 +491,9 @@ class SocketEngine (object):
         self._conn_callback (conn, conn.error is None and ok_cb or conn.write_err_cb, (conn, ) + conn.write_cb_args, stack=conn.write_tb)
 
     def read_avail (self, conn, max_len=0):
-        """ eof is true when peer closed """
+        """ read all available data from buffer until max_len is reached.
+            returns buf,eof
+                eof is true when peer closed """
         eof = self._read_ahead (conn, max_len)
         buf = conn.rd_ahead_buf
         conn.rd_ahead_buf = ""
@@ -497,8 +507,10 @@ class SocketEngine (object):
 
 
     def read_unblock (self, conn, expect_len, ok_cb, err_cb=None, cb_args=()):
-        """ on timeout/error, err_cb will be called, the connection will be close afterward, 
-        you must not do it you self, any operation that will lock the server is forbident in err_cb().
+        """ 
+            read fixed len data, when done ok_cb() will be called.
+            on timeout/error, err_cb will be called, the connection will be close afterward, 
+            you must not do it you self, any operation that will lock the server is forbident in err_cb().
             ok_cb/err_cb param: conn, *cb_args
             """
         assert isinstance (conn, Connection)
@@ -528,7 +540,10 @@ class SocketEngine (object):
             self._conn_callback (conn, conn.error is None and ok_cb or err_cb, (conn, ) + cb_args, count=2)
 
     def readline_unblock (self, conn, max_len, ok_cb, err_cb=None, cb_args=()):
-        """ on timeout/error, err_cb will be called, the connection will be close afterward, 
+        """ 
+            read until '\n' is received or max_len is reached.
+            if the line is longer than max_len, a Exception(line maxlength exceed) will be in conn.error which received by err_cb()
+            on timeout/error, err_cb will be called, the connection will be close afterward, 
             you must not do it yourself, any operation that will lock the server is forbident in err_cb ().
             ok_cb/err_cb param: conn, *cb_args
             NOTE: when done, you have to watch_conn or remove_conn by yourself
