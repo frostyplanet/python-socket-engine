@@ -280,7 +280,8 @@ class CoroEngine ():
             del self.delegators[te.coro]
         else:
             # The thread is root-level. Raise in client code.
-            te.reraise()
+            self.threads[coro] = event
+#            te.reraise()
 
             
     def kill_thread(self, coro):

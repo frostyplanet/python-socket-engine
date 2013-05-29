@@ -86,7 +86,6 @@ class Connection (object):
             self.status_rd = ConnState.CLOSED
             if self.sock:
                 self.sock.close ()
-        print "close"
         return
 
     close = _close

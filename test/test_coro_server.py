@@ -20,7 +20,7 @@ data = "".join (["1234567890" for i in xrange (0, 10000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
-g_round = 5
+g_round = 50000
 
 g_send_count = 0
 g_client_num = 4
