@@ -97,24 +97,10 @@ def start_coro_server (poll=None):
     
     print "starting unblock server with", str(poll)
 
-    def _handler (conn):
-        try:
-            buf = yield conn.read (len(data))
-            yield conn.write (buf)
-            server.watch_conn (conn)
-        except PeerCloseError:
-            #print "peerclose"
-            pass
-        except Exception, e:
-            getLogger ("server").exception (e)
-            print e
-        return
-
-    server.listen_addr (server_addr, _handler)
-
-#    def _handler2 (conn):
+#    def _handler (conn):
 #        try:
-#            yield conn.write (conn.get_readbuf ())
+#            buf = yield conn.read (len(data))
+#            yield conn.write (buf)
 #            server.watch_conn (conn)
 #        except PeerCloseError:
 #            #print "peerclose"
@@ -123,7 +109,21 @@ def start_coro_server (poll=None):
 #            getLogger ("server").exception (e)
 #            print e
 #        return
-#    server.listen_addr (server_addr, readable_cb=server.read_unblock, readable_cb_args=(len (data), _handler2))
+#
+#    server.listen_addr (server_addr, _handler)
+
+    def _handler2 (conn):
+        try:
+            yield conn.write (conn.get_readbuf ())
+            server.watch_conn (conn)
+        except PeerCloseError:
+            #print "peerclose"
+            pass
+        except Exception, e:
+            getLogger ("server").exception (e)
+            print e
+        return
+    server.listen_addr (server_addr, readable_cb=server.read_unblock, readable_cb_args=(len (data), _handler2))
 
 
 

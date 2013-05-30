@@ -179,7 +179,8 @@ def poll (self, timeout=100):
 
 
 def _connect_cb (self, sock, event):
-    event.ret = CoroConnection (self, sock)
+    event.ret = CoroConnection (sock)
+    event.ret.engine = self
     self.coroengine.resume_from_waitable (event)
 
 def _connect_err_cb (self, error, event):
