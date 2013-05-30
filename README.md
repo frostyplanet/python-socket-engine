@@ -8,7 +8,7 @@ async / sync socket framework based on callbacks
 Features
 __________
 
-* pure python, no third party cpython module is required. tested for python >= 2.3.4  
+* pure python, no third party cpython module is required. tested for python >= 2.3.4 
 
 * listen multiple port for different callbacks
 
@@ -16,7 +16,9 @@ __________
 
 * (fix-len)read_unblock, (fix-len)write_unblock, readline_unblock, connect_unblock is implemented for aync nonblocking mode.
 
-* GIL friendly, so you can use it to create your threaded server or threaded-pool server as you want
+* threading friendly, so you can use it to create your threaded server or threaded-pool server as you want
+
+* optional pure python coroutine support (inspired by Bluelet)
 
 * optional timeout for nonblocking mode (in seconds)
 
@@ -41,6 +43,8 @@ Core components
     socket_engine.py  (framework)
 
 	socket_engine_ssl.py (SSL support)
+
+	socket_engine_coro.py  (coroutine suport)
 
     io_poll.py     (poll & epoll & pyev backends)
 
