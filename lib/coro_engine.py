@@ -96,10 +96,12 @@ class SpawnEvent(Event):
     def __init__(self, coro):
         self.spawned = coro
 
-    def proc (self, engine, coro):
-        engine.threads[self.spawned] = ValueEvent(None)  # Spawn.
-        engine.advance_thread(self.spawned, None)
-        return True
+#    def proc (self, engine, coro):
+#        engine.threads[self.spawned] = ValueEvent(None)  # Spawn.
+#        return True
+#        engine.poll ()
+#        engine.advance_thread(coro, None)
+#        engine.advance_thread(self.spawned, None)
 
 
 class JoinEvent(Event):
@@ -262,19 +264,22 @@ class CoroEngine ():
         delegators and joiners as necessary and returning the specified
         value to any delegating parent.
         """
-        del self.threads[coro]
+        try:
+            del self.threads[coro]
+        except KeyError:
+            pass
 
-        # Resume delegator.
-        if self.delegators and coro in self.delegators:
-            self.threads[self.delegators[coro]] = ValueEvent(return_value)
-            del self.delegators[coro]
+        if self.threads:
+            # Resume delegator.
+            if self.delegators and coro in self.delegators:
+                self.threads[self.delegators[coro]] = ValueEvent(return_value)
+                del self.delegators[coro]
 
         # Resume joiners.
 #        if self.joiners and coro in self.joiners:
 #            for parent in self.joiners[coro]:
 #                self.threads[parent] = ValueEvent(None)
 #            del self.joiners[coro]
-        self.poll ()
 
 
     def advance_thread(self, coro, value, is_exc=False):
@@ -299,13 +304,13 @@ class CoroEngine ():
                     reraise (sys.exc_info())
                 else:
                     # Thread raised some other exception.
-                    self.handle_exception (coro, e)
+                    self.handle_exception (coro, sys.exc_info())
                 return
             if isinstance(event, EngineEvent):
                 if event.done:
 #                    self.resume_from_waitable (event, coro)
                     if event.error is not None:
-                        self.handle_exception(coro)
+                        self.handle_exception(coro, (type(event.error), event.error, None))
                     else:
                         value = event.ret
                         continue
@@ -329,7 +334,12 @@ class CoroEngine ():
                 #self.advance_thread(coro, event.value)
                 value = event.value
                 continue
-            else:
+            elif isinstance(event, SpawnEvent):
+                self.threads[coro] = ValueEvent(None)
+                self.threads[event.spawned] = ValueEvent(None)  # Spawn.
+                value = None
+                continue
+            elif isinstance(event, Event):
                 self.threads[coro] = event
                 val = event.proc (self, coro)
                 if val is None:
@@ -342,8 +352,7 @@ class CoroEngine ():
 
 
 
-    def handle_exception (self, coro, e=None):
-        exc_info = sys.exc_info()
+    def handle_exception (self, coro, exc_info):
 
         if coro in self.delegators:
             # The thread is a delegate. Raise exception in its
@@ -395,25 +404,21 @@ class CoroEngine ():
         if not coro:
             return
         #self.have_ready = True
-        try:
-            value = event.fire()
-            self.advance_thread(coro, value)
-        except Exception, e:
-            self.handle_exception(coro, e)
-            return
+        if event.error is None:
+            self.advance_thread(coro, event.ret)
+        else:
+            self.handle_exception(coro, (type(event.error), event.error, None))
 
 
     def poll (self):
-        if not self.threads:
-            return
         # running immediate events until nothing is ready.
         for coro, event in self.threads.items():
             val = event.proc (self, coro)
-            if val is None:
-                continue
-            if val is True:
-                val = None
-            self.advance_thread (coro, val)
+#            if val is None:
+#                continue
+#            if val is True:
+#                val = None
+#            self.advance_thread (coro, val)
 
 #                if isinstance(event, ReturnEvent):
 #                    # Thread is done.

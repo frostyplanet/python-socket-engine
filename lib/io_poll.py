@@ -33,8 +33,7 @@ class Poll (object):
         self._poll = select.poll ()
 
     def register (self, fd, event, handler, handler_args=()):
-        handler_args = handler_args or ()
-        assert event in ['r', 'w']
+        """ event is one of ['r', 'w'] """
         data = self._handles.get (fd)
         if not data:
             if event == 'r':
@@ -45,18 +44,17 @@ class Poll (object):
                 self._poll.register (fd, self._out)
         else: # one call to register can be significant overhead
             if event == 'r':
-                data[0] = (handler, handler_args, )
-                if data[1]:
+                if data[1] and not data[0]:
                     self._poll.modify (fd, self._in | self._out)
+                data[0] = (handler, handler_args, )
             else: # w
-                if data[0]:
+                if data[0] and not data[1]:
                     self._poll.modify (fd, self._in | self._out)
                 data[1] = (handler, handler_args, )
         return True
 
     def replace_read (self, fd, handler, handler_args=()):
         """ if read handler is register before, replace it, otherwise just do nothing """
-        handler_args = handler_args or ()
         data = self._handles.get (fd)
         if data and data[0]:
             data[0] = (handler, handler_args, )
@@ -65,7 +63,7 @@ class Poll (object):
         
 
     def unregister (self, fd, event='r'):
-        assert event in ['r', 'w', 'rw', 'all']
+        #assert event in ['r', 'w', 'rw', 'all']
         data = self._handles.get (fd)
         if not data:
             return
@@ -163,8 +161,7 @@ try:
             self._out = pyev.EV_WRITE
 
         def register (self, fd, event, handler, handler_args=()):
-            handler_args = handler_args or ()
-            assert event in ['r', 'w']
+            """ event is one of ['r', 'w'] """
             watcher = self._watchers.get (fd)
             if not watcher:
                 if event == 'r':
@@ -190,7 +187,6 @@ try:
 
         def replace_read (self, fd, handler, handler_args=()):
             """ if read handler is register before, replace it, otherwise just do nothing """
-            handler_args = handler_args or ()
             watcher = self._watchers.get (fd)
             if not watcher:
                 return
@@ -201,7 +197,7 @@ try:
 
 
         def unregister (self, fd, event='r'):
-            assert event in ['r', 'w', 'rw', 'all']
+            #assert event in ['r', 'w', 'rw', 'all']
             watcher = self._watchers.get (fd)
             if not watcher:
                 return

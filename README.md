@@ -87,9 +87,12 @@ blocking-mode client, unblock-mode server,  time: 18.5491240025 (v0.9), 17.95422
 
 blocking-mode clinet, blocking-mode server, time: 19.9843790531 (v0.9), 18.6820361614 (v1)
 
+blocking-mode client, coro server,			time: 21.3860938549 (v1.1)
+
 unblock-mode client, unblocking-mode server, time: 25.2030720711 (v0.9)
 
 unblock-mode client, block-mode server, time:  26.1123259068 (v0.9), 23.7259261608 (v1)
+
 
 Examples
 ----------------

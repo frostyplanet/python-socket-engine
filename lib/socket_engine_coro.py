@@ -127,7 +127,7 @@ def poll (self, timeout=100):
     self._poll_tid = thread.get_ident ()
     __exec_callback = self._exec_callback
 
-#    self.coroengine.poll ()
+    self.coroengine.poll ()
 
     #locking when poll may be prevent other thread to lock, but it's possible poll is not thread-safe, so we do the lazy approach
     if self._pending_fd_ops:
@@ -209,28 +209,31 @@ def read_coro (self, conn, expect_len):
     else:
         conn.rd_buf = ""
         conn.rd_expect_len = expect_len
-    conn.status_rd = ConnState.TOREAD
-    conn.read_cb_args = (event, )
-    conn.read_err_cb = self._read_cb
     if self._do_unblock_read (conn, self._read_cb, direct=True):
         event.error = conn.error
         event.ret = conn.rd_buf
         event.done = True
+    else:
+        conn.read_cb_args = (event, )
+        conn.read_err_cb = self._read_cb
+        conn.status_rd = ConnState.TOREAD
     return event
 
 def write_coro (self, conn, buf):
     """    NOTE: write only temporaryly register for write event, will not effect read
         """
     assert isinstance (conn, Connection)
-    conn.status_wr = ConnState.TOWRITE
     conn.wr_offset = 0
-    conn.write_err_cb = self._write_cb
     event = EngineEvent ()
-    conn.write_cb_args = (event, )
     if self._do_unblock_write (conn, buf, self._write_cb, direct=True):
         event.error = conn.error
         event.ret = len (buf)
         event.done = True
+    else:
+        conn.write_cb_args = (event, )
+        conn.write_err_cb = self._write_cb
+        conn.status_wr = ConnState.TOWRITE
+
     return event
 
 def readline_coro (self, conn, max_len):
@@ -243,15 +246,16 @@ def readline_coro (self, conn, max_len):
         NOTE: when done, you have to watch_conn or remove_conn by yourself
         """
     assert isinstance (conn, Connection)
-    conn.status_rd = ConnState.TOREAD
     conn.rd_buf = ""
     event = EngineEvent ()
-    conn.read_cb_args = (event, )
-    conn.read_err_cb = self._read_cb
     if self._do_unblock_readline (conn, self._read_cb, max_len, direct=True):
         event.error = conn.error
         event.ret = conn.rd_buf
         event.done = True
+    else:
+        conn.read_cb_args = (event, )
+        conn.read_err_cb = self._read_cb
+        conn.status_rd = ConnState.TOREAD
     return event
 
 

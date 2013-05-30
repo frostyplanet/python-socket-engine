@@ -51,7 +51,16 @@ class TestDelegator (TestCoro):
         self.run_test (exc_grandparent())
         print "test_2 done"
 
-
+    
+    def test3 (self):
+        def exc_child ():
+            yield bluelet.null()
+        def parent ():
+            for i in xrange (10000):
+#                yield exc_child ()
+                yield bluelet.spawn(exc_child ())
+        self.run_test (parent())
+        print "test_3 done"
 
 if __name__ == '__main__':
     unittest.main ()
