@@ -48,11 +48,17 @@ class Event(object):
     def proc (self, engine, coro):
         pass
 
+
 class WaitableEvent(Event):
     """A waitable event is one encapsulating an action that can be
     waited for using a select() call. That is, it's an event with an
     associated file descriptor.
     """
+    def __init__ (self):
+        self.ret = None
+        self.error = None
+        self.done = False
+
     def waitables(self):
         """Return "waitable" objects to pass to select(). Should return
         three iterables for input readiness, output readiness, and
@@ -62,10 +68,15 @@ class WaitableEvent(Event):
         return (), (), ()
 
     def fire(self):
-        """Called when an assoicated file descriptor becomes ready
-        (i.e., is returned from a select() call).
-        """
         pass
+
+class EngineEvent (WaitableEvent):
+
+    def fire (self):
+        if self.error is not None:
+            raise self.error
+        return self.ret
+
 
 class ValueEvent(Event):
     """An event that does nothing but return a fixed value."""
@@ -238,13 +249,12 @@ class CoroEngine ():
         # Maps child coroutines to delegating parents.
         self.delegators = {}
         self.event2coro = {}
-        self.suspends = {}  # key is delegators parent
 
         # Maps child coroutines to joining (exit-waiting) parents.
         self.joiners = collections.defaultdict(list)
 
 #        self._waitables = []  # TODO  process WaitableEvent
-        self._unknown_waitables = dict ()
+#        self._unknown_waitables = dict ()
         self.have_ready = True
 
     def complete_thread(self, coro, return_value):
@@ -260,11 +270,11 @@ class CoroEngine ():
             del self.delegators[coro]
 
         # Resume joiners.
-        if self.joiners and coro in self.joiners:
-            for parent in self.joiners[coro]:
-                self.threads[parent] = ValueEvent(None)
-            del self.joiners[coro]
-#        self.poll ()
+#        if self.joiners and coro in self.joiners:
+#            for parent in self.joiners[coro]:
+#                self.threads[parent] = ValueEvent(None)
+#            del self.joiners[coro]
+        self.poll ()
 
 
     def advance_thread(self, coro, value, is_exc=False):
@@ -276,29 +286,29 @@ class CoroEngine ():
         exception is thrown into the coroutine.
         """
         while True:
-            if is_exc:
-                try:
+            try:
+                if is_exc:
                     event = coro.throw(*value)
-                except StopIteration:
-                    self.complete_thread(coro, None)
-                    return
-                except:
-                    reraise (sys.exc_info())
-            else:
-                try:
+                else:
                     event = coro.send(value)
-                except StopIteration:
-                    self.complete_thread(coro, None)
-                    return
-                except Exception, e:
+            except StopIteration:
+                self.complete_thread(coro, None)
+                return
+            except Exception, e:
+                if is_exc:
+                    reraise (sys.exc_info())
+                else:
                     # Thread raised some other exception.
                     self.handle_exception (coro, e)
-                    return
-            self.threads[coro] = event
-            if isinstance(event, WaitableEvent):
-                if self._unknown_waitables.has_key (event):
-                    del self._unknown_waitables[event]
-                    self.resume_from_waitable (event, coro)
+                return
+            if isinstance(event, EngineEvent):
+                if event.done:
+#                    self.resume_from_waitable (event, coro)
+                    if event.error is not None:
+                        self.handle_exception(coro)
+                    else:
+                        value = event.ret
+                        continue
                     #don't have to wait
                 else:
                     self.event2coro[event] = coro
@@ -320,6 +330,7 @@ class CoroEngine ():
                 value = event.value
                 continue
             else:
+                self.threads[coro] = event
                 val = event.proc (self, coro)
                 if val is None:
                     return
@@ -333,8 +344,6 @@ class CoroEngine ():
 
     def handle_exception (self, coro, e=None):
         exc_info = sys.exc_info()
-#        te = ThreadException(coro, sys.exc_info())
-#        event = ExceptionEvent(te.exc_info)
 
         if coro in self.delegators:
             # The thread is a delegate. Raise exception in its
@@ -380,12 +389,11 @@ class CoroEngine ():
 
     def resume_from_waitable (self, event, coro=None):
         # Run the IO operation, but catch socket errors.
+        if not event.done:
+            return
+        coro = self.event2coro.get (event)
         if not coro:
-            coro = self.event2coro.get (event)
-            if not coro:
-                self._unknown_waitables[event] = None
-                return
-            del self.event2coro[event]
+            return
         #self.have_ready = True
         try:
             value = event.fire()

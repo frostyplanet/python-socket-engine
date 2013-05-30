@@ -153,7 +153,11 @@ def main ():
 #    test_client_unblock ()
 
 if __name__ == '__main__':
+    import yappi
+    yappi.start()
     main ()
+    yappi.print_stats()
+
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 :

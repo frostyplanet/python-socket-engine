@@ -2,8 +2,8 @@
 # coding:utf-8
 
 
-from socket_engine import Connection, ReadNonBlockError, WriteNonblockError, PeerCloseError, TCPSocketEngine
-from coro_engine import CoroEngine, WaitableEvent
+from socket_engine import Connection, ReadNonBlockError, WriteNonblockError, PeerCloseError, TCPSocketEngine, ConnState
+from coro_engine import CoroEngine, EngineEvent
 import traceback
 import socket
 import errno
@@ -35,49 +35,24 @@ def patch_coro_engine (_object):
     _init (_object)
     _inject_class (_object.__class__)
 
-class EngineEvent (WaitableEvent):
-
-    def __init__ (self):
-        self.ret = None
-        self.error = None
-
-    def fire (self):
-        if self.error is not None:
-            raise self.error
-        return self.ret
 
 class CoroConnection(Connection):
     
     def __init__ (self, *args, **k_args):
         Connection.__init__ (self, *args, **k_args)
 
-    def _read_cb (self, conn, event):
-        event.ret = conn.get_readbuf ()
-        event.error = conn.error
-        self.engine.coroengine.resume_from_waitable (event)
-
-    def _write_cb (self, conn, event):
-        event.error = conn.error
-        self.engine.coroengine.resume_from_waitable (event)
 
     def read (self, expect_len):
-        event = EngineEvent ()
-        self.engine.read_unblock (self, expect_len, self._read_cb, self._read_cb, cb_args=(event,))
-        return event
+        return self.engine.read_coro (self, expect_len)
 
     def read_avail (self, maxlen):
         return self.engine.read_avail (self, maxlen)
 
     def write (self, buf):
-        event = EngineEvent ()
-        event.ret = len(buf)
-        self.engine.write_unblock (self, buf, self._write_cb, self._write_cb, cb_args=(event, ))
-        return event
+        return self.engine.write_coro (self, buf)
 
     def readline (self, maxlen):
-        event = EngineEvent ()
-        self.engine.readline_unblock (self, maxlen, self._read_cb, self._read_cb, cb_args=(event,))
-        return event
+        return self.engine.readline_coro (self, maxlen)
 
 
      
@@ -181,15 +156,102 @@ def poll (self, timeout=100):
 def _connect_cb (self, sock, event):
     event.ret = CoroConnection (sock)
     event.ret.engine = self
+    event.done = True
     self.coroengine.resume_from_waitable (event)
 
 def _connect_err_cb (self, error, event):
     event.error = error
+    event.done = True
     self.coroengine.resume_from_waitable (event)
 
 def connect_coro (self, addr, syn_retry=None):
     event = EngineEvent ()
     self.connect_unblock (addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
+    return event
+
+def _read_cb (self, conn, event):
+    event.ret = conn.rd_buf
+    event.error = conn.error
+    event.done = True
+    self.coroengine.resume_from_waitable (event)
+
+def _write_cb (self, conn, event):
+    event.error = conn.error
+    event.done = True
+    self.coroengine.resume_from_waitable (event)
+
+
+
+def read_coro (self, conn, expect_len):
+    """ 
+        read fixed len data
+        on timeout/error, err_cb will be called, the connection will be close afterward, 
+    """
+    assert isinstance (conn, Connection)
+    assert expect_len > 0
+    ahead_len = len (conn.rd_ahead_buf)
+    event = EngineEvent ()
+    if ahead_len:
+        if conn.error is not None:
+            event.error = conn.error
+            event.done
+            return event
+        elif ahead_len >= expect_len:
+            conn.rd_buf = conn.rd_ahead_buf[0:expect_len]
+            conn.rd_ahead_buf = conn.rd_ahead_buf[expect_len:]
+            event.ret = conn.rd_buf
+            event.done = True
+            return event
+        else:
+            conn.rd_buf = conn.rd_ahead_buf
+            conn.rd_ahead_buf = ""
+            conn.rd_expect_len = expect_len - ahead_len
+    else:
+        conn.rd_buf = ""
+        conn.rd_expect_len = expect_len
+    conn.status_rd = ConnState.TOREAD
+    conn.read_cb_args = (event, )
+    conn.read_err_cb = self._read_cb
+    if self._do_unblock_read (conn, self._read_cb, direct=True):
+        event.error = conn.error
+        event.ret = conn.rd_buf
+        event.done = True
+    return event
+
+def write_coro (self, conn, buf):
+    """    NOTE: write only temporaryly register for write event, will not effect read
+        """
+    assert isinstance (conn, Connection)
+    conn.status_wr = ConnState.TOWRITE
+    conn.wr_offset = 0
+    conn.write_err_cb = self._write_cb
+    event = EngineEvent ()
+    conn.write_cb_args = (event, )
+    if self._do_unblock_write (conn, buf, self._write_cb, direct=True):
+        event.error = conn.error
+        event.ret = len (buf)
+        event.done = True
+    return event
+
+def readline_coro (self, conn, max_len):
+    """ 
+        read until '\n' is received or max_len is reached.
+        if the line is longer than max_len, a Exception(line maxlength exceed) will be in conn.error which received by err_cb()
+        on timeout/error, err_cb will be called, the connection will be close afterward, 
+        you must not do it yourself, any operation that will lock the server is forbident in err_cb ().
+        ok_cb/err_cb param: conn, *cb_args
+        NOTE: when done, you have to watch_conn or remove_conn by yourself
+        """
+    assert isinstance (conn, Connection)
+    conn.status_rd = ConnState.TOREAD
+    conn.rd_buf = ""
+    event = EngineEvent ()
+    conn.read_cb_args = (event, )
+    conn.read_err_cb = self._read_cb
+    if self._do_unblock_readline (conn, self._read_cb, max_len, direct=True):
+        event.error = conn.error
+        event.ret = conn.rd_buf
+        event.done = True
     return event
 
 
@@ -215,12 +277,18 @@ def _funcToMethod(func,clas,method_name=None):
 
 def _inject_class (cls):
     _funcToMethod (connect_coro, cls)
+    _funcToMethod (read_coro, cls)
+    _funcToMethod (write_coro, cls)
+    _funcToMethod (readline_coro, cls)
+    _funcToMethod (run_coro, cls)
+
     _funcToMethod (_connect_cb, cls)
     _funcToMethod (_connect_err_cb, cls)
     _funcToMethod (poll, cls)
-    _funcToMethod (run_coro, cls)
     _funcToMethod (_exec_callback, cls)
     _funcToMethod (_conn_callback, cls)
+    _funcToMethod (_read_cb, cls)
+    _funcToMethod (_write_cb, cls)
 
     if cls.__dict__.has_key ("connect_unblock_ssl"):
         _funcToMethod (connect_ssl_coro, cls)
