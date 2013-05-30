@@ -20,7 +20,7 @@ data = "".join (["1234567890" for i in xrange (0, 10000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
-g_round = 50
+g_round = 50000
 
 g_send_count = 0
 g_client_num = 4
@@ -111,6 +111,21 @@ def start_coro_server (poll=None):
         return
 
     server.listen_addr (server_addr, _handler)
+
+#    def _handler2 (conn):
+#        try:
+#            yield conn.write (conn.get_readbuf ())
+#            server.watch_conn (conn)
+#        except PeerCloseError:
+#            #print "peerclose"
+#            pass
+#        except Exception, e:
+#            getLogger ("server").exception (e)
+#            print e
+#        return
+#    server.listen_addr (server_addr, readable_cb=server.read_unblock, readable_cb_args=(len (data), _handler2))
+
+
 
     def _run (_server):
         while True:

@@ -97,29 +97,24 @@ class Poll (object):
             return [(function, arg), ...] to exec
             """
         while True:
-            try:
-                plist = self._poll.poll (timeout/ self._timeout_scale) # fd, event
-                hlist = []
-                for fd, event in plist:
-                    data = self._handles.get (fd)
-                    if not data:
-                        raise Exception ("bug")
-                    else:
-                        if event & self._in_real:
-                            if data[0]:
-                                hlist.append (data[0])
-                            elif event & self._in:
-                                raise Exception ("bug")
-                        if event & self._out_real:
-                            if data[1]:
-                                hlist.append (data[1])
-                            elif event & self._out:
-                                raise Exception ("bug")
-                return hlist
-            except select.error, e:
-                if e[0] == errno.EINTR:
-                    continue
-                raise e
+            plist = self._poll.poll (timeout/ self._timeout_scale) # fd, event
+            hlist = []
+            for fd, event in plist:
+                data = self._handles.get (fd)
+                if not data:
+                    raise Exception ("bug")
+                else:
+                    if event & self._in_real:
+                        if data[0]:
+                            hlist.append (data[0])
+                        elif event & self._in:
+                            raise Exception ("bug")
+                    if event & self._out_real:
+                        if data[1]:
+                            hlist.append (data[1])
+                        elif event & self._out:
+                            raise Exception ("bug")
+            return hlist
 
 
 

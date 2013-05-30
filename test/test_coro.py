@@ -10,9 +10,8 @@ class TestCoro (unittest.TestCase):
 
     def run_test (self, func):
         engine = CoroEngine ()
-        engine.run_coro (func) 
-        while engine.threads:
-            engine.poll ()
+        engine.run (func) 
+        engine.loop ()
 
 
 
@@ -36,6 +35,7 @@ class TestDelegator (TestCoro):
             print 'Parent ending.'
 
         self.run_test (parent())
+        print "test_1 done"
     
     def test2 (self):
         def exc_child():
@@ -49,6 +49,7 @@ class TestDelegator (TestCoro):
         def exc_grandparent():
             yield bluelet.spawn(exc_parent())
         self.run_test (exc_grandparent())
+        print "test_2 done"
 
 
 

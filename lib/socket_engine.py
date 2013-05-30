@@ -88,7 +88,11 @@ class Connection (object):
                 self.sock.close ()
         return
 
-    close = _close
+    def close (self):
+        self.engine.close_conn (self)
+
+    def watch (self):
+        self.engine.watch_conn (self)
 
     def is_open (self):
         return self.status_rd != ConnState.CLOSED
@@ -111,6 +115,7 @@ class SocketEngine ():
     _last_checktimeout = None
     _checktimeout_inv = 0
     _poll_tid = None
+    _connection_cls = Connection
 
     STACK_DEPTH = 20  # recursive stack limit
     READAHEAD_LEN = 8 * 1024
@@ -165,9 +170,10 @@ class SocketEngine ():
 
     def put_sock (self, sock, readable_cb, readable_cb_args=(), idle_timeout_cb=None, stack=True):
         """  setup readable / idle callbacks for a passive socket, and watch for events, return Connection object """
-        conn = Connection (sock,
+        conn = self._connection_cls (sock,
                 readable_cb=readable_cb, readable_cb_args=readable_cb_args, 
                 idle_timeout_cb=idle_timeout_cb)
+        conn.engine = self
         if stack and self._debug:
             conn.putsock_tb = traceback.extract_stack()[0:-1]
         self.watch_conn (conn)

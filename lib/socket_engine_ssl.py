@@ -10,8 +10,14 @@ from socket_engine import *
 
 """
     provides connect_unblock_ssl() and listen_addr_ssl().
-    use SSLSocketEngine directly or use inject_class_ssl with a TCPSocketEngine object.
+    use SSLSocketEngine directly or use patch_ssl_engine with a TCPSocketEngine object.
 """
+
+def patch_ssl_engine (_object, cert_file, ssl_version=ssl.PROTOCOL_SSLv23):
+    assert isinstance (_object, TCPSocketEngine)
+    _init (_object, cert_file, ssl_version)
+    _inject_class (_object.__class__)
+
 
 
 def _init (self, cert_file, ssl_version=ssl.PROTOCOL_SSLv23):
@@ -146,11 +152,6 @@ def _funcToMethod(func,clas,method_name=None):
     clas.__dict__[method_name]=method
 
 
-
-def inject_ssl_method (_object, cert_file, ssl_version=ssl.PROTOCOL_SSLv23):
-    assert isinstance (_object, TCPSocketEngine)
-    _init (_object, cert_file, ssl_version)
-    _inject_class (_object.__class__)
 
 def _inject_class (cls):
     _funcToMethod(connect_unblock_ssl, cls)
