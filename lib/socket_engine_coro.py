@@ -45,6 +45,9 @@ class CoroConnection(Connection):
         self.engine.read_unblock (self, expect_len, self._read_cb, self._read_cb, cb_args=(event,))
         return event
 
+    def read_avail (self, maxlen):
+        return self.engine.read_avail (self, maxlen)
+
     def write (self, buf):
         event = EngineEvent ()
         event.ret = len(buf)
@@ -60,7 +63,10 @@ class CoroConnection(Connection):
         Connection.close (self)
 
     def close (self):
-        self.engine.close_conn ()
+        self.engine.close_conn (self)
+
+    def watch (self):
+        self.engine.watch_conn (self)
 
        
 
@@ -174,9 +180,9 @@ class CoroSocketEngine (TCPSocketEngine):
         event.error = error
         self.coroengine.resume_from_waitable (event)
 
-    def connect_coro (self, addr, event, syn_retry=None):
+    def connect_coro (self, addr, syn_retry=None):
         event = EngineEvent ()
-        self.connect_unblock (self, addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
+        self.connect_unblock (addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
         return event
 
 

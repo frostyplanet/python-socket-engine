@@ -246,30 +246,37 @@ class CoroEngine ():
         is_exc is True, then the value must be an exc_info tuple and the
         exception is thrown into the coroutine.
         """
-        try:
-            if is_exc:
+        if is_exc:
+            try:
                 next_event = coro.throw(*value)
-            else:
+            except StopIteration:
+                self.complete_thread(coro, None)
+                return
+            except:
+                exc_info = sys.exc_info ()
+                _reraise (exc_info[0], exc_info[1], exc_info[2])
+        else:
+            try:
                 next_event = coro.send(value)
-            if isinstance(next_event, types.GeneratorType):
-                # Automatically invoke sub-coroutines. (Shorthand for
-                # explicit bluelet.call().)
-                next_event = DelegationEvent(next_event)
-            elif isinstance(next_event, WaitableEvent):
+            except StopIteration:
+                self.complete_thread(coro, None)
+                return
+            except Exception, e:
+                # Thread raised some other exception.
+                self.handle_exception (coro, e)
+                return
+        if isinstance(next_event, types.GeneratorType):
+            # Automatically invoke sub-coroutines. (Shorthand for
+            # explicit bluelet.call().)
+            next_event = DelegationEvent(next_event)
+        elif isinstance(next_event, WaitableEvent):
 #                self._waitables.append (next_event)
-                self.event2coro[next_event] = coro
+            self.event2coro[next_event] = coro
 
-            self.threads[coro] = next_event
-
-        except StopIteration:
-            # Thread is done.
-            self.complete_thread(coro, None)
-        except:
-            # Thread raised some other exception.
-            self.handle_exception (coro)
+        self.threads[coro] = next_event
 
 
-    def handle_exception (self, coro):
+    def handle_exception (self, coro, e=None):
         del self.threads[coro]
         te = ThreadException(coro, sys.exc_info())
         event = ExceptionEvent(te.exc_info)
@@ -280,8 +287,10 @@ class CoroEngine ():
             del self.delegators[te.coro]
         else:
             # The thread is root-level. Raise in client code.
+#            if self.threads.get (coro) != event:
+#            else:
+            #print self.threads, sys.exc_info()
             self.threads[coro] = event
-#            te.reraise()
 
             
     def kill_thread(self, coro):
@@ -317,11 +326,11 @@ class CoroEngine ():
                 # Broken pipe. Remote host disconnected.
                 pass
             else:
-                self.handle_exception(coro)
+                self.handle_exception(coro, exc)
                 return
                 #traceback.print_exc()   #TODO ???
-        except:
-            self.handle_exception(coro)
+        except Exception, e:
+            self.handle_exception(coro, e)
             # Abort the coroutine.
 #            del self.event2coro[event]
 #            self.threads[coro] = ReturnEvent(None)
@@ -370,8 +379,8 @@ class CoroEngine ():
                 elif isinstance(event, WaitableEvent):
                     self.event2coro[event] = coro
                     if self._unknown_waitables.has_key (event):
-                        self.resume_from_waitable (event)
                         del self._unknown_waitables[event]
+                        self.resume_from_waitable (event)
 
             # Only start the select when nothing else is ready.
             if not have_ready:

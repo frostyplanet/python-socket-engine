@@ -20,7 +20,7 @@ data = "".join (["1234567890" for i in xrange (0, 10000)])
 global_lock = threading.Lock ()
 
 server_addr = ("0.0.0.0", 20300)
-g_round = 50000
+g_round = 50
 
 g_send_count = 0
 g_client_num = 4
@@ -103,6 +103,7 @@ def start_coro_server (poll=None):
             yield conn.write (buf)
             server.watch_conn (conn)
         except PeerCloseError:
+            #print "peerclose"
             pass
         except Exception, e:
             getLogger ("server").exception (e)
@@ -131,6 +132,9 @@ def main ():
 #    server = start_block_server ()
     time.sleep (1)
     test_client ()
+    while server.coroengine.threads:
+        print "waiting for coro ends", server.coroengine.threads
+        time.sleep (1)
 #    test_client_unblock ()
 
 if __name__ == '__main__':
