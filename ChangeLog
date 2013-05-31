@@ -1,0 +1,11 @@
+v0.3 用在配管项目，那个时候每个connection都有一个状态，底层的poll实现只能注册一种事件，读写还不能是同时的，开始的时候异步方式要比同步方式慢一倍。
+
+v0.4 做了一个简单的异步http方式接口
+
+v0.7 加了ssl支持和rpc client/server
+
+v0.9 写了transwarp私有协议代理，改成每个connection读写可以不互相影响，网速快的时候可以跑出十多兆的流量吞吐，本地回环上的顺序读写测试可以达到千兆速率。异步回调方式已经可以和同步方式一样快了
+
+v1.0 加了readahead的特性，最大限度减少了异步方式额外开销。
+
+v1.1 加了coroutine支持。异步回调可以转变为在generator中yield的写法。为了避免多继承，增加了patch_ssl_engine()和patch_coro_engine()
