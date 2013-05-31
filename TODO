@@ -1,0 +1,3 @@
+* timeout is global, should allow per connection setting
+* sleep, join, kill is not implemented in CoroEngine
+* EVPoll not compatible with CoroEngine
