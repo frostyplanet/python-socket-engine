@@ -26,8 +26,6 @@ __________
 
 * optional new connection callback to filter out unauthorized connections
 
-* optional debug stack trace for aync calls
-
 * readahead buffer using epoll edge-trigger mode
 
 Compared to other framework
