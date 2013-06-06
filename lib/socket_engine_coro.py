@@ -24,7 +24,9 @@ import types
 
     use CoroSocketEngine directly or use patch_coro_engine with a SocketEngine object.
     if you need ssl you need to call patch_ssl_engine() before calling patch_coro_engine()
-    
+
+    run_coro() is thread-safe. 
+    And because connect_coro(), read_coro(), readline_coro(), write_coro() can only be called in generator coro, so there's no thread-safty concern.
 """
 
 
@@ -111,13 +113,18 @@ def _exec_callback (self, cb, args, stack=None):
             raise e
 
 def run_coro (self, coro):
-    if isinstance (coro, types.GeneratorType):
-        self.coroengine.run (coro)
-    elif callable (coro):
-        r = coro ()
-        if isinstance (r, types.GeneratorType):
-            self.coroengine.run (r)
-            
+    if thread.get_ident () == self._poll_tid:
+        if isinstance (coro, types.GeneratorType):
+            self.coroengine.run (coro)
+        elif callable (coro):
+            r = coro ()
+            if isinstance (r, types.GeneratorType):
+               self.coroengine.run (r)
+    else:
+       self._lock ()
+       self._pending_ops.append ((self.run_coro, coro))
+       self._unlock ()
+
             
 
 def poll (self, timeout=100):
@@ -130,10 +137,10 @@ def poll (self, timeout=100):
     self.coroengine.poll ()
 
     #locking when poll may be prevent other thread to lock, but it's possible poll is not thread-safe, so we do the lazy approach
-    if self._pending_fd_ops:
+    if self._pending_ops:
         self._lock ()
-        fd_ops = self._pending_fd_ops
-        self._pending_fd_ops = []
+        fd_ops = self._pending_ops
+        self._pending_ops = []
         self._unlock ()
         for _cb in fd_ops:
             _cb[0](_cb[1])

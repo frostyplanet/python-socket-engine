@@ -105,6 +105,12 @@ class Connection (object):
 
 class SocketEngine ():
 
+    """
+        NOTE: 
+            connect_unblock(), watch_conn(), remove_conn(), close_conn() is thread-safe.
+            while read_unblock() / readline_unblock() / write_unblock() should be avoid calling in threads other than polling thread, they are not thread-safe,
+    """
+
     sock = None
     _poll = None
     _lock = None
@@ -131,7 +137,7 @@ class SocketEngine ():
         self._unlock = self._locker.release
         self._poll = poll
         self._cbs = [] # (handler, handler_args)
-        self._pending_fd_ops = [] # (handler, conn)
+        self._pending_ops = [] # (handler, conn)
         self._checktimeout_inv = 0
         self.get_time = time.time
         self.is_blocking = is_blocking
@@ -211,7 +217,7 @@ class SocketEngine ():
                 self.logger.error ("peer %s: watch conn error %s" % (conn.peer, str(e)))
         else:
             self._lock ()
-            self._pending_fd_ops.append ((self.watch_conn, conn))
+            self._pending_ops.append ((self.watch_conn, conn))
             self._unlock ()
 
 
@@ -233,7 +239,7 @@ class SocketEngine ():
                     self.logger.exception ("peer %s: %s" % (conn.peer, str(e)))
         else:
             self._lock ()
-            self._pending_fd_ops.append ((self.remove_conn, conn))
+            self._pending_ops.append ((self.remove_conn, conn))
             self._unlock ()
 
     def close_conn (self, conn):
@@ -248,7 +254,7 @@ class SocketEngine ():
             conn._close ()
         else:
             self._lock ()
-            self._pending_fd_ops.append ((self.close_conn, conn))
+            self._pending_ops.append ((self.close_conn, conn))
             self._unlock ()
 
 
@@ -671,10 +677,10 @@ class SocketEngine ():
         self._poll_tid = thread.get_ident ()
         __exec_callback = self._exec_callback
         #locking when poll may be prevent other thread to lock, but it's possible poll is not thread-safe, so we do the lazy approach
-        if self._pending_fd_ops:
+        if self._pending_ops:
             self._lock ()
-            fd_ops = self._pending_fd_ops
-            self._pending_fd_ops = []
+            fd_ops = self._pending_ops
+            self._pending_ops = []
             self._unlock ()
             for _cb in fd_ops:
                 _cb[0](_cb[1])
@@ -768,7 +774,9 @@ class TCPSocketEngine (SocketEngine):
         if res == 0:
             self._exec_callback (ok_cb, (sock, ) + cb_args, stack)
         elif res == errno.EINPROGRESS:
+            self._lock ()
             self._poll.register (fd, 'w', __on_connected, (sock, ))
+            self._unlock ()
         else:
             sock.close ()
             err_msg = errno.errorcode[res]
