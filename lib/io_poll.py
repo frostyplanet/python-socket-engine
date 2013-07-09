@@ -82,8 +82,11 @@ class Poll (object):
                 data[1] = None
                 return True
         try:
-            del self._handles[fd]
             self._poll.unregister (fd)
+        except KeyError:
+            pass
+        try:
+            del self._handles[fd]
             return True
         except KeyError:
             pass
@@ -100,7 +103,7 @@ class Poll (object):
             for fd, event in plist:
                 data = self._handles.get (fd)
                 if not data:
-                    raise Exception ("bug")
+                    raise Exception ("bug, fd %s, event %s" % (fd, event))
                 else:
                     if event & self._in_real:
                         if data[0]:

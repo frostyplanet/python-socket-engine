@@ -42,6 +42,7 @@ class ConnState (object):
 
 class Connection (object):
     sock = None
+    engine = None
     status_rd = ConnState.EXTENDED_USING
     status_wr = None
     wr_offset = None
@@ -286,12 +287,12 @@ class SocketEngine ():
                 if e[0] == errno.EAGAIN:
                     return #no more
                 if e[0] != errno.EINTR:
-                    msg = "accept error (unlikely): " + str(e)
+                    msg = "accept (sock %s %s) error (unlikely): " % (sock, readable_cb, str(e))
                     self.log_error (msg)
         return
 
     def listen (self, sock, readable_cb, readable_cb_args=(), 
-            idle_timeout_cb=None, new_conn_cb=None, backlog=20, accept_cb=None, is_blocking=None):
+            idle_timeout_cb=None, new_conn_cb=None, backlog=50, accept_cb=None, is_blocking=None):
         """ readable_cb :  (connObj, ) + readable_cb_args,
             new_conn_cb :  (socket)    # intercept a new connection socket, you may do authorization checking or handshake protocol, 
                     new_conn_cb returns True to tell the socketengine to perform put_sock(), or returns False to tell socketengine to ignore
@@ -314,9 +315,9 @@ class SocketEngine ():
             fcntl.fcntl(sock, fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
         except IOError, e:
             self.log_error ("cannot set FD_CLOEXEC on listening socket fd, %s" % (str(e)))
+        sock.listen (backlog)
         self._poll.register (sock.fileno (), 'r', accept_cb, 
                 (sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb, is_blocking))
-        sock.listen (backlog)
 
     def unlisten (self, sock):
         self._poll.unregister (sock.fileno (), 'r')

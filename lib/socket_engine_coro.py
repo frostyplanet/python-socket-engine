@@ -119,11 +119,11 @@ def run_coro (self, coro):
         elif callable (coro):
             r = coro ()
             if isinstance (r, types.GeneratorType):
-               self.coroengine.run (r)
+                self.coroengine.run (r)
     else:
-       self._lock ()
-       self._pending_ops.append ((self.run_coro, coro))
-       self._unlock ()
+        self._lock ()
+        self._pending_ops.append ((self.run_coro, coro))
+        self._unlock ()
 
             
 
@@ -269,7 +269,7 @@ def readline_coro (self, conn, max_len):
 try:
     from socket_engine_ssl import SSLSocketEngine
 
-    def connect_ssl_coro (addr, syn_retry=None):
+    def connect_ssl_coro (self, addr, syn_retry=None):
         event = EngineEvent ()
         SSLSocketEngine (self, addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
         return event
@@ -277,12 +277,12 @@ try:
 except ImportError:
     pass
 
-def _funcToMethod(func,clas,method_name=None):
+def _funcToMethod(func, clas, method_name=None):
     """ only works for old type class """
     import new
-    method = new.instancemethod(func,None,clas)
-    if not method_name: method_name=func.__name__
-    clas.__dict__[method_name]=method
+    method = new.instancemethod (func, None, clas)
+    if not method_name: method_name = func.__name__
+    clas.__dict__[method_name] = method
 
 
 

@@ -134,18 +134,18 @@ class TestPoll (unittest.TestCase):
         ev2.clear ()
         print "test_3 done", str(poll)
 
-#    def test_epoll (self):
-#        ep = io_poll.Poll()
-#        self._test_1 (ep)
-#        self._test_2 (ep)
-#        self._test_3 (ep)
-#
-#    def test_poll (self):
-#        p = io_poll.Poll()
-#        self._test_1 (p)
-#        self._test_2 (p)
-#        self._test_3 (p)
-#
+    def test_epoll (self):
+        ep = io_poll.Poll()
+        self._test_1 (ep)
+        self._test_2 (ep)
+        self._test_3 (ep)
+
+    def test_poll (self):
+        p = io_poll.Poll()
+        self._test_1 (p)
+        self._test_2 (p)
+        self._test_3 (p)
+
 
 
     def test_evpoll (self):

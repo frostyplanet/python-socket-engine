@@ -246,8 +246,11 @@ def kill(coro):
 
 class CoroEngine ():
 
+    MAX_CONCURRENT = 500
+
     def __init__ (self):
         self.threads = {}
+        self.pending_threads = []
         # Maps child coroutines to delegating parents.
         self.delegators = {}
         self.event2coro = {}
@@ -388,8 +391,11 @@ class CoroEngine ():
 
 
     def run (self, coro):
-        self.threads[coro] = None
-        self.advance_thread(coro, None)
+        if len (self.threads) > self.MAX_CONCURRENT:
+            self.pending_threads.append (coro)
+        else:
+            self.threads[coro] = None
+            self.advance_thread(coro, None)
 #        self.poll ()
 
     def loop (self):
@@ -412,8 +418,18 @@ class CoroEngine ():
 
     def poll (self):
         # running immediate events until nothing is ready.
+        if not self.threads and self.pending_threads:
+            if len(self.pending_threads) > self.MAX_CONCURRENT:
+                self.threads = dict.fromkeys (self.pending_threads[0:self.MAX_CONCURRENT], None)
+                self.pending_threads = self.pending_threads[self.MAX_CONCURRENT:]
+            else:
+                self.threads = dict.fromkeys (self.pending_threads, None)
+                self.pending_threads = []
         for coro, event in self.threads.items():
-            val = event.proc (self, coro)
+            if event is None:
+                self.advance_thread (coro, None)
+            else:
+                val = event.proc (self, coro)
 #            if val is None:
 #                continue
 #            if val is True:
