@@ -25,8 +25,8 @@ import types
     use CoroSocketEngine directly or use patch_coro_engine with a SocketEngine object.
     if you need ssl you need to call patch_ssl_engine() before calling patch_coro_engine()
 
-    run_coro() is thread-safe. 
-    And because connect_coro(), read_coro(), readline_coro(), write_coro() can only be called in generator coro, so there's no thread-safty concern.
+    run_coro() is thread-safe. but connect_coro() is remained to see
+    And because read_coro(), readline_coro(), write_coro() can only be called in generator coro, so there's no thread-safty concern.
 """
 
 

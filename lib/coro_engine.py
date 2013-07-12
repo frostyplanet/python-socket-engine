@@ -428,7 +428,7 @@ class CoroEngine ():
         for coro, event in self.threads.items():
             if event is None:
                 self.advance_thread (coro, None)
-            else:
+            elif isinstance (event, Event):
                 val = event.proc (self, coro)
 #            if val is None:
 #                continue

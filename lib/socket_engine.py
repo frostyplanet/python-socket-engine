@@ -220,6 +220,7 @@ class SocketEngine ():
             self._lock ()
             self._pending_ops.append ((self.watch_conn, conn))
             self._unlock ()
+            self._poll.wakeup ()
 
 
     def _unblock_readable (self, conn):
@@ -242,6 +243,7 @@ class SocketEngine ():
             self._lock ()
             self._pending_ops.append ((self.remove_conn, conn))
             self._unlock ()
+            self._poll.wakeup ()
 
     def close_conn (self, conn):
         """ remove and close connection """
@@ -257,6 +259,7 @@ class SocketEngine ():
             self._lock ()
             self._pending_ops.append ((self.close_conn, conn))
             self._unlock ()
+            self._poll.wakeup ()
 
 
     def _accept_conn (self, sock, readable_cb, readable_cb_args, idle_timeout_cb, new_conn_cb, is_blocking=False):
@@ -653,6 +656,7 @@ class SocketEngine ():
             self._lock ()
             self._cbs.append ((cb, args, stack))
             self._unlock ()
+            self._poll.wakeup ()
 
 
     def _exec_callback (self, cb, args, stack=None):

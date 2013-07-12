@@ -85,15 +85,15 @@ blocking-mode server & unblock-mode server both using 1 thread;
 
 result:
 
-blocking-mode client, unblock-mode server,  time: 18.5491240025 (v0.9), 17.9542291164 (v1)
+blocking-mode client, unblock-mode server,  time: 18.5491 (v0.9), 17.9542 (v1), 17.7019 (v1.2)
 
-blocking-mode clinet, blocking-mode server, time: 19.9843790531 (v0.9), 18.6820361614 (v1)
+blocking-mode clinet, blocking-mode server, time: 19.9843 (v0.9), 18.6820 (v1), 
 
-blocking-mode client, coro server,			time: 21.3860938549 (v1.1)
+blocking-mode client, coro server,			time: 				21.3861 (v1.1), 20.6825 (v1.2)
 
-unblock-mode client, unblocking-mode server, time: 25.2030720711 (v0.9)
+unblock-mode client, unblocking-mode server, time: 25.2030 (v0.9), 				24.4142 (v1.2)
 
-unblock-mode client, block-mode server, time:  26.1123259068 (v0.9), 23.7259261608 (v1)
+unblock-mode client, block-mode server, 	time:  26.1123 (v0.9), 23.7259 (v1), 22.6464 (v1.2)
 
 
 Examples
