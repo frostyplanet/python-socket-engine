@@ -391,11 +391,11 @@ class CoroEngine ():
 
 
     def run (self, coro):
-        if len (self.threads) > self.MAX_CONCURRENT:
-            self.pending_threads.append (coro)
-        else:
-            self.threads[coro] = None
-            self.advance_thread(coro, None)
+#        if len (self.threads) > self.MAX_CONCURRENT:
+#            self.pending_threads.append (coro)
+#        else:
+        self.threads[coro] = None
+        self.advance_thread(coro, None)
 #        self.poll ()
 
     def loop (self):
@@ -418,13 +418,13 @@ class CoroEngine ():
 
     def poll (self):
         # running immediate events until nothing is ready.
-        if not self.threads and self.pending_threads:
-            if len(self.pending_threads) > self.MAX_CONCURRENT:
-                self.threads = dict.fromkeys (self.pending_threads[0:self.MAX_CONCURRENT], None)
-                self.pending_threads = self.pending_threads[self.MAX_CONCURRENT:]
-            else:
-                self.threads = dict.fromkeys (self.pending_threads, None)
-                self.pending_threads = []
+#        if not self.threads and self.pending_threads:
+#            if len(self.pending_threads) > self.MAX_CONCURRENT:
+#                self.threads = dict.fromkeys (self.pending_threads[0:self.MAX_CONCURRENT], None)
+#                self.pending_threads = self.pending_threads[self.MAX_CONCURRENT:]
+#            else:
+#                self.threads = dict.fromkeys (self.pending_threads, None)
+#                self.pending_threads = []
         for coro, event in self.threads.items():
             if event is None:
                 self.advance_thread (coro, None)

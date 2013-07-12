@@ -11,6 +11,8 @@
 """
 
 import time
+import os
+import fcntl
 
 try:
     import epoll as select # python-epoll provide the same interface as select.poll, which unlike 2.6's select.epoll
@@ -31,6 +33,23 @@ class Poll (object):
         self._handles = dict ()
         self.debug = debug
         self._poll = select.poll ()
+        self._fd_r, self._fd_w = os.pipe ()
+        fcntl.fcntl (self._fd_r, fcntl.F_SETFL, os.O_NONBLOCK)
+        self.register (self._fd_r, 'r', self._empty_fd)
+
+    def _empty_fd (self):
+        while True:
+            try:
+                os.read (self._fd_r, 256)
+            except OSError, e:
+                if e.args[0] in [errno.EAGAIN, errno.EINTR]:
+                    return
+                import traceback
+                traceback.print_exc()
+
+    def wakeup (self):
+        os.write (self._fd_w, 't')
+
 
     def register (self, fd, event, handler, handler_args=()):
         """ event is one of ['r', 'w'] """
@@ -130,6 +149,7 @@ if 'epoll' in dir(select):
         _out_real = select.EPOLLOUT | select.EPOLLWRBAND | select.EPOLLHUP | select.EPOLLERR 
         _timeout_scale = 1000.0
 
+
         def __init__ (self, is_edge=True):
             self.is_edge = is_edge
             self._handles = dict ()
@@ -140,7 +160,11 @@ if 'epoll' in dir(select):
             else:
                 self._in = select.EPOLLIN
                 self._out = select.EPOLLOUT
-            
+            self._fd_r, self._fd_w = os.pipe ()
+            fcntl.fcntl (self._fd_r, fcntl.F_SETFL, os.O_NONBLOCK)
+            self.register (self._fd_r, 'r', self._empty_fd)
+
+           
 
 try:       
     import pyev
@@ -273,7 +297,6 @@ except ImportError:
 
 def get_poll ():
     if 'epoll' in dir(select):
-        print "e"
         return EPoll ()
     else:
         return Poll ()

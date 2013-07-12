@@ -124,6 +124,7 @@ def run_coro (self, coro):
         self._lock ()
         self._pending_ops.append ((self.run_coro, coro))
         self._unlock ()
+    self._poll.wakeup ()
 
             
 
