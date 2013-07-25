@@ -152,30 +152,6 @@ class ReturnEvent(Event):
 #    def time_left(self):
 #        return max(self.wakeup_time - time.time(), 0.0)
 
-#class ReadEvent(WaitableEvent):
-#    """Reads from a file-like object."""
-#    def __init__(self, fd, bufsize):
-#        self.fd = fd
-#        self.bufsize = bufsize
-#
-#    def waitables(self):
-#        return(self.fd,), (), ()
-#
-#    def fire(self):
-#        return self.fd.read(self.bufsize)
-#
-#class WriteEvent(WaitableEvent):
-#    """Writes to a file-like object."""
-#    def __init__(self, fd, data):
-#        self.fd = fd
-#        self.data = data
-#
-#    def waitable(self):
-#        return(), (self.fd,), ()
-#
-#    def fire(self):
-#        self.fd.write(self.data)
-
 
 class ThreadException(Exception):
     def __init__(self, coro, exc_info):
@@ -297,6 +273,7 @@ class CoroEngine():
             try:
                 if is_exc:
                     event = coro.throw(*value)
+                    is_exc = False
                 else:
                     event = coro.send(value)
             except StopIteration:
@@ -313,7 +290,8 @@ class CoroEngine():
                 if event.done:
 #                    self.resume_from_waitable(event, coro)
                     if event.error is not None:
-                        self.handle_exception(coro, (type(event.error), event.error, None))
+                        #throw exception
+                        self.advance_thread(coro, (type(event.error), event.error, None), is_exc=True)
                     else:
                         value = event.ret
                         continue
@@ -413,7 +391,8 @@ class CoroEngine():
         if event.error is None:
             self.advance_thread(coro, event.ret)
         else:
-            self.handle_exception(coro, (type(event.error), event.error, None))
+            #throw exception
+            self.advance_thread(coro, (type(event.error), event.error, None), is_exc=True)
 
 
     def poll(self):

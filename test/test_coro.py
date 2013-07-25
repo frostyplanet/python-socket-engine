@@ -5,6 +5,7 @@ import _env
 import lib.coro_engine as bluelet
 from lib.coro_engine import CoroEngine
 import unittest
+import threading
 
 class TestCoro(unittest.TestCase):
 
@@ -51,10 +52,33 @@ class TestDelegator(TestCoro):
         self.run_test(exc_grandparent())
         print "test_2 done"
 
-    def test_exception_2_level(self):
+    def test_exception_2(self):
+        event = threading.Event()
         def child():
             print "ch"
             yield 
+            raise Exception("child error")
+        def parent():
+            print "p"
+            try:
+                yield child()
+            except Exception, e:
+                print "parent caught", e
+                yield 
+                yield bluelet.end(1)
+            return
+        def grandparent():
+            try:
+                print "g"
+                res = yield parent()
+                assert res == 1
+            except:
+                self.fail("impossible")
+        self.run_test(grandparent())
+
+    def test_exception_3(self):
+        def child():
+            print "ch"
             raise Exception("child error")
         def parent():
             print "p"
@@ -72,16 +96,18 @@ class TestDelegator(TestCoro):
             except:
                 self.fail("impossible")
         self.run_test(grandparent())
-    
-    def test3(self):
-        def exc_child():
-            yield bluelet.null()
-        def parent():
-            for i in xrange(10000):
-#                yield exc_child()
-                yield bluelet.spawn(exc_child())
-        self.run_test(parent())
-        print "test_3 done"
+
+#
+#    
+#    def test3(self):
+#        def exc_child():
+#            yield bluelet.null()
+#        def parent():
+#            for i in xrange(10000):
+##                yield exc_child()
+#                yield bluelet.spawn(exc_child())
+#        self.run_test(parent())
+#        print "test_3 done"
 
 if __name__ == '__main__':
     unittest.main()
