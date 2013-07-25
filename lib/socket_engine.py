@@ -673,7 +673,7 @@ class SocketEngine():
                 self.log_error(msg)
             else:
                 self.log_exception(msg)
-                raise e
+                raise
 
     def poll(self, timeout=100):
         """ you need to call this in a loop, return fd numbers polled each time,

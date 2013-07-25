@@ -86,30 +86,22 @@ def test_client():
 
 def start_coro_server(poll=None):
     global server_addr
-    if not poll:
-        if 'EPoll' in dir(iopoll):
-            poll = iopoll.EPoll(True)
-        else:
-            poll = iopoll.Poll()
+    poll = iopoll.get_poll()
     server = CoroSocketEngine(poll, is_blocking=False, debug=False)
     server.set_logger(getLogger("server"))
 #    server.get_time = tc.time
-    
     print "starting unblock server with", str(poll)
-
     def _handler(conn):
         try:
             buf = yield conn.read(len(data))
             yield conn.write(buf)
             server.watch_conn(conn)
         except PeerCloseError:
-            #print "peerclose"
             pass
         except Exception, e:
             getLogger("server").exception(e)
             print e
         return
-
     server.listen_addr(server_addr, _handler)
 
 #    def _handler2(conn):

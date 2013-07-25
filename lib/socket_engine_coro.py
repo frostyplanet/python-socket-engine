@@ -101,16 +101,8 @@ def _exec_callback(self, cb, args, stack=None):
             self.coroengine.run(r)
     except Exception, e:
         msg = "uncaught %s exception in %s %s:%s" % (type(e), str(cb), str(args), str(e))
-        if stack:
-            l_out = stack
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            l_in = traceback.extract_tb(exc_traceback)[1:] # 0 is here
-            stack_trace = "\n".join(map(lambda f: "in '%s':%d %s() '%s'" % f, l_out + l_in))
-            msg += "\nprevious stack trace [%s]" % (stack_trace)
-            self.log_error(msg)
-        else:
-            self.log_exception(msg)
-            raise e
+        self.log_exception(msg)
+        raise
 
 def run_coro(self, coro):
     if thread.get_ident() == self._poll_tid:

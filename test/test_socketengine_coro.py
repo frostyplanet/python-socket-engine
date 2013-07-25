@@ -165,7 +165,7 @@ class TestConnect(unittest.TestCase):
                 event.set()
                 conn.close()
                 self.fail("imposible")
-            except ConnectNonblockError:
+            except ConnectNonblockError, e:
                 event.set()
                 return
         engine.run_coro(_client)
