@@ -34,8 +34,8 @@ def _reraise(typ, exc, tb):
     raise typ, exc, tb
     """)
 
-def reraise (exc_info):
-    _reraise (exc_info[0], exc_info[1], exc_info[2])
+def reraise(exc_info):
+    _reraise(exc_info[0], exc_info[1], exc_info[2])
 
 # Basic events used for thread scheduling.
 
@@ -45,7 +45,7 @@ class Event(object):
     and communicate with the scheduler.
     """
 
-    def proc (self, engine, coro):
+    def proc(self, engine, coro):
         pass
 
 
@@ -54,7 +54,7 @@ class WaitableEvent(Event):
     waited for using a select() call. That is, it's an event with an
     associated file descriptor.
     """
-    def __init__ (self):
+    def __init__(self):
         self.ret = None
         self.error = None
         self.done = False
@@ -62,17 +62,17 @@ class WaitableEvent(Event):
     def waitables(self):
         """Return "waitable" objects to pass to select(). Should return
         three iterables for input readiness, output readiness, and
-        exceptional conditions (i.e., the three lists passed to
+        exceptional conditions(i.e., the three lists passed to
         select()).
         """
-        return (), (), ()
+        return(), (), ()
 
     def fire(self):
         pass
 
-class EngineEvent (WaitableEvent):
+class EngineEvent(WaitableEvent):
 
-    def fire (self):
+    def fire(self):
         if self.error is not None:
             raise self.error
         return self.ret
@@ -83,7 +83,7 @@ class ValueEvent(Event):
     def __init__(self, value):
         self.value = value
 
-    def proc (self, engine, coro):
+    def proc(self, engine, coro):
         engine.advance_thread(coro, self.value)
 
 #class ExceptionEvent(Event):
@@ -96,10 +96,10 @@ class SpawnEvent(Event):
     def __init__(self, coro):
         self.spawned = coro
 
-#    def proc (self, engine, coro):
+#    def proc(self, engine, coro):
 #        engine.threads[self.spawned] = ValueEvent(None)  # Spawn.
 #        return True
-#        engine.poll ()
+#        engine.poll()
 #        engine.advance_thread(coro, None)
 #        engine.advance_thread(self.spawned, None)
 
@@ -111,18 +111,18 @@ class JoinEvent(Event):
     def __init__(self, child):
         self.child = child
 
-    def proc (self, engine, coro):
+    def proc(self, engine, coro):
         engine.threads[coro] = SUSPENDED  # Suspend.
         engine.joiners[self.child].append(coro)
 
-class KillEvent(Event):
-    """Unschedule a child thread."""
-    def __init__(self, child):
-        self.child = child
-
-    def proc (self, engine, coro):
-        self.kill_thread(self.child)
-        return True
+#class KillEvent(Event):
+#    """Unschedule a child thread."""
+#    def __init__(self, child):
+#        self.child = child
+#
+#    def proc(self, engine, coro):
+#        self.kill_thread(self.child)
+#        return True
 
 #class DelegationEvent(Event):
 #    """Suspend execution of the current thread, start a new thread and,
@@ -134,12 +134,12 @@ class KillEvent(Event):
 
 class ReturnEvent(Event):
     """Return a value the current thread's delegator at the point of
-    delegation. Ends the current (delegate) thread.
+    delegation. Ends the current(delegate) thread.
     """
     def __init__(self, value):
         self.value = value
 
-    def proc (self, engine, coro):
+    def proc(self, engine, coro):
         engine.complete_thread(coro, self.value)
 
 
@@ -159,7 +159,7 @@ class ReturnEvent(Event):
 #        self.bufsize = bufsize
 #
 #    def waitables(self):
-#        return (self.fd,), (), ()
+#        return(self.fd,), (), ()
 #
 #    def fire(self):
 #        return self.fd.read(self.bufsize)
@@ -171,7 +171,7 @@ class ReturnEvent(Event):
 #        self.data = data
 #
 #    def waitable(self):
-#        return (), (self.fd,), ()
+#        return(), (self.fd,), ()
 #
 #    def fire(self):
 #        self.fd.write(self.data)
@@ -226,10 +226,10 @@ def end(value = None):
     """
     return ReturnEvent(value)
 
-def sleep(duration):
-    """Event: suspend the thread for ``duration`` seconds.
-    """
-    return SleepEvent(duration)
+#def sleep(duration):
+#    """Event: suspend the thread for ``duration`` seconds.
+#    """
+#    return SleepEvent(duration)
 
 def join(coro):
     """Suspend the thread until another, previously `spawn`ed thread
@@ -237,29 +237,29 @@ def join(coro):
     """
     return JoinEvent(coro)
 
-def kill(coro):
-    """Halt the execution of a different `spawn`ed thread.
-    """
-    return KillEvent(coro)
+#def kill(coro):
+#    """Halt the execution of a different `spawn`ed thread.
+#    """
+#    return KillEvent(coro)
 
  
 
-class CoroEngine ():
+class CoroEngine():
 
     MAX_CONCURRENT = 500
 
-    def __init__ (self):
+    def __init__(self):
         self.threads = {}
         self.pending_threads = []
         # Maps child coroutines to delegating parents.
         self.delegators = {}
         self.event2coro = {}
 
-        # Maps child coroutines to joining (exit-waiting) parents.
+        # Maps child coroutines to joining(exit-waiting) parents.
         self.joiners = collections.defaultdict(list)
 
 #        self._waitables = []  # TODO  process WaitableEvent
-#        self._unknown_waitables = dict ()
+#        self._unknown_waitables = dict()
         self.have_ready = True
 
     def complete_thread(self, coro, return_value):
@@ -279,10 +279,10 @@ class CoroEngine ():
                 del self.delegators[coro]
 
         # Resume joiners.
-#        if self.joiners and coro in self.joiners:
-#            for parent in self.joiners[coro]:
-#                self.threads[parent] = ValueEvent(None)
-#            del self.joiners[coro]
+        if self.joiners and coro in self.joiners:
+            for parent in self.joiners[coro]:
+                self.threads[parent] = ValueEvent(None)
+            del self.joiners[coro]
 
 
     def advance_thread(self, coro, value, is_exc=False):
@@ -304,14 +304,14 @@ class CoroEngine ():
                 return
             except Exception, e:
                 if is_exc:
-                    reraise (sys.exc_info())
+                    reraise(sys.exc_info())
                 else:
                     # Thread raised some other exception.
-                    self.handle_exception (coro, sys.exc_info())
+                    self.handle_exception(coro, sys.exc_info())
                 return
             if isinstance(event, EngineEvent):
                 if event.done:
-#                    self.resume_from_waitable (event, coro)
+#                    self.resume_from_waitable(event, coro)
                     if event.error is not None:
                         self.handle_exception(coro, (type(event.error), event.error, None))
                     else:
@@ -344,7 +344,7 @@ class CoroEngine ():
                 continue
             elif isinstance(event, Event):
                 self.threads[coro] = event
-                val = event.proc (self, coro)
+                val = event.proc(self, coro)
                 if val is None:
                     return
                 if val == True:
@@ -355,7 +355,7 @@ class CoroEngine ():
 
 
 
-    def handle_exception (self, coro, exc_info):
+    def handle_exception(self, coro, exc_info):
 
         if coro in self.delegators:
             # The thread is a delegate. Raise exception in its
@@ -368,7 +368,7 @@ class CoroEngine ():
         else:
             self.advance_thread(coro, exc_info, True)
             # The thread is root-level. Raise in client code.
-#            if self.threads.get (coro) != event:
+#            if self.threads.get(coro) != event:
 #            else:
             #print self.threads, sys.exc_info()
 
@@ -376,7 +376,7 @@ class CoroEngine ():
 
             
     def kill_thread(self, coro):
-        """Unschedule this thread and its (recursive) delegates.
+        """Unschedule this thread and its(recursive) delegates.
         """
         # Collect all coroutines in the delegation stack.
         coros = [coro]
@@ -390,23 +390,23 @@ class CoroEngine ():
             self.complete_thread(coro, None)
 
 
-    def run (self, coro):
-#        if len (self.threads) > self.MAX_CONCURRENT:
-#            self.pending_threads.append (coro)
+    def run(self, coro):
+#        if len(self.threads) > self.MAX_CONCURRENT:
+#            self.pending_threads.append(coro)
 #        else:
         self.threads[coro] = None
         self.advance_thread(coro, None)
-#        self.poll ()
+#        self.poll()
 
-    def loop (self):
+    def loop(self):
         while self.threads:
-            self.poll ()
+            self.poll()
 
-    def resume_from_waitable (self, event, coro=None):
+    def resume_from_waitable(self, event, coro=None):
         # Run the IO operation, but catch socket errors.
         if not event.done:
             return
-        coro = self.event2coro.get (event)
+        coro = self.event2coro.get(event)
         if not coro:
             return
         #self.have_ready = True
@@ -416,25 +416,25 @@ class CoroEngine ():
             self.handle_exception(coro, (type(event.error), event.error, None))
 
 
-    def poll (self):
+    def poll(self):
         # running immediate events until nothing is ready.
 #        if not self.threads and self.pending_threads:
 #            if len(self.pending_threads) > self.MAX_CONCURRENT:
-#                self.threads = dict.fromkeys (self.pending_threads[0:self.MAX_CONCURRENT], None)
+#                self.threads = dict.fromkeys(self.pending_threads[0:self.MAX_CONCURRENT], None)
 #                self.pending_threads = self.pending_threads[self.MAX_CONCURRENT:]
 #            else:
-#                self.threads = dict.fromkeys (self.pending_threads, None)
+#                self.threads = dict.fromkeys(self.pending_threads, None)
 #                self.pending_threads = []
         for coro, event in self.threads.items():
             if event is None:
-                self.advance_thread (coro, None)
-            elif isinstance (event, Event):
-                val = event.proc (self, coro)
+                self.advance_thread(coro, None)
+            elif isinstance(event, Event):
+                val = event.proc(self, coro)
 #            if val is None:
 #                continue
 #            if val is True:
 #                val = None
-#            self.advance_thread (coro, val)
+#            self.advance_thread(coro, val)
 
 #                if isinstance(event, ReturnEvent):
 #                    # Thread is done.

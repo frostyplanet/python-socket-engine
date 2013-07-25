@@ -16,11 +16,11 @@ import types
 
 
 """
-    add the ability to run pure python coro (GeneratorType) in SocketEngine.
+    add the ability to run pure python coro(GeneratorType) in SocketEngine.
     coding regulation is simular to Bluelet.
 
-    it will Replace Connection with CoroConnection (providing read()/write()/readline() coro operation).
-    and add connect_coro (), run_coro() to SocketEngine
+    it will Replace Connection with CoroConnection(providing read()/write()/readline() coro operation).
+    and add connect_coro(), run_coro() to SocketEngine
 
     use CoroSocketEngine directly or use patch_coro_engine with a SocketEngine object.
     if you need ssl you need to call patch_ssl_engine() before calling patch_coro_engine()
@@ -32,173 +32,173 @@ import types
 
 
 
-def patch_coro_engine (_object):
-    assert isinstance (_object, TCPSocketEngine)
-    _init (_object)
-    _inject_class (_object.__class__)
+def patch_coro_engine(_object):
+    assert isinstance(_object, TCPSocketEngine)
+    _init(_object)
+    _inject_class(_object.__class__)
 
 
 class CoroConnection(Connection):
     
-    def __init__ (self, *args, **k_args):
-        Connection.__init__ (self, *args, **k_args)
+    def __init__(self, *args, **k_args):
+        Connection.__init__(self, *args, **k_args)
 
 
-    def read (self, expect_len):
-        return self.engine.read_coro (self, expect_len)
+    def read(self, expect_len):
+        return self.engine.read_coro(self, expect_len)
 
-    def read_avail (self, maxlen):
-        return self.engine.read_avail (self, maxlen)
+    def read_avail(self, maxlen):
+        return self.engine.read_avail(self, maxlen)
 
-    def write (self, buf):
-        return self.engine.write_coro (self, buf)
+    def write(self, buf):
+        return self.engine.write_coro(self, buf)
 
-    def readline (self, maxlen):
-        return self.engine.readline_coro (self, maxlen)
+    def readline(self, maxlen):
+        return self.engine.readline_coro(self, maxlen)
 
 
      
-def _init (self):
-    self.coroengine = CoroEngine ()
+def _init(self):
+    self.coroengine = CoroEngine()
     self._connection_cls = CoroConnection
 
       
 
-class CoroSocketEngine (TCPSocketEngine):
+class CoroSocketEngine(TCPSocketEngine):
 
     
-    def __init__ (self, *args, **k_args):
+    def __init__(self, *args, **k_args):
         """ 
         sock:   sock to listen
             """
-        TCPSocketEngine.__init__ (self, *args, **k_args)
-        _init (self) 
+        TCPSocketEngine.__init__(self, *args, **k_args)
+        _init(self) 
 
 
 
-def _conn_callback (self, conn, cb, args, stack=None, count=1):
+def _conn_callback(self, conn, cb, args, stack=None, count=1):
     if conn.error is not None:
-        self.close_conn (conn) #NOTICE: we will close the conn before err_cb
-    if not callable (cb):
+        self.close_conn(conn) #NOTICE: we will close the conn before err_cb
+    if not callable(cb):
         return
     if conn.stack_count < self.STACK_DEPTH:
         conn.stack_count += count
         #try:
-        r = cb (*args)
-        if r and isinstance (r, types.GeneratorType):
-            self.coroengine.run (r)
+        r = cb(*args)
+        if r and isinstance(r, types.GeneratorType):
+            self.coroengine.run(r)
     else:
         conn.stack_count = 0
-        self._lock ()
-        self._cbs.append ((cb, args, stack))
-        self._unlock ()
+        self._lock()
+        self._cbs.append((cb, args, stack))
+        self._unlock()
 
 
-def _exec_callback (self, cb, args, stack=None):
+def _exec_callback(self, cb, args, stack=None):
     try:
-        r = cb (*args)
-        if r and isinstance (r, types.GeneratorType):
-            self.coroengine.run (r)
+        r = cb(*args)
+        if r and isinstance(r, types.GeneratorType):
+            self.coroengine.run(r)
     except Exception, e:
         msg = "uncaught %s exception in %s %s:%s" % (type(e), str(cb), str(args), str(e))
         if stack:
             l_out = stack
             exc_type, exc_value, exc_traceback = sys.exc_info()
-            l_in = traceback.extract_tb (exc_traceback)[1:] # 0 is here
-            stack_trace = "\n".join (map (lambda f: "in '%s':%d %s() '%s'" % f, l_out + l_in))
+            l_in = traceback.extract_tb(exc_traceback)[1:] # 0 is here
+            stack_trace = "\n".join(map(lambda f: "in '%s':%d %s() '%s'" % f, l_out + l_in))
             msg += "\nprevious stack trace [%s]" % (stack_trace)
-            self.log_error (msg)
+            self.log_error(msg)
         else:
-            self.log_exception (msg)
+            self.log_exception(msg)
             raise e
 
-def run_coro (self, coro):
-    if thread.get_ident () == self._poll_tid:
-        if isinstance (coro, types.GeneratorType):
-            self.coroengine.run (coro)
-        elif callable (coro):
-            r = coro ()
-            if isinstance (r, types.GeneratorType):
-                self.coroengine.run (r)
+def run_coro(self, coro):
+    if thread.get_ident() == self._poll_tid:
+        if isinstance(coro, types.GeneratorType):
+            self.coroengine.run(coro)
+        elif callable(coro):
+            r = coro()
+            if isinstance(r, types.GeneratorType):
+                self.coroengine.run(r)
     else:
-        self._lock ()
-        self._pending_ops.append ((self.run_coro, coro))
-        self._unlock ()
-    self._poll.wakeup ()
+        self._lock()
+        self._pending_ops.append((self.run_coro, coro))
+        self._unlock()
+    self._poll.wakeup()
 
             
 
-def poll (self, timeout=100):
+def poll(self, timeout=100):
     """ you need to call this in a loop, return fd numbers polled each time,
         timeout is in ms.
     """
-    self._poll_tid = thread.get_ident ()
+    self._poll_tid = thread.get_ident()
     __exec_callback = self._exec_callback
 
-    self.coroengine.poll ()
+    self.coroengine.poll()
 
     #locking when poll may be prevent other thread to lock, but it's possible poll is not thread-safe, so we do the lazy approach
     if self._pending_ops:
-        self._lock ()
+        self._lock()
         fd_ops = self._pending_ops
         self._pending_ops = []
-        self._unlock ()
+        self._unlock()
         for _cb in fd_ops:
             _cb[0](_cb[1])
 
     if self._cbs:
-        self._lock ()
+        self._lock()
         cbs = self._cbs
         self._cbs = []
-        self._unlock ()
+        self._unlock()
         for cb in cbs:
-            __exec_callback (*cb)
+            __exec_callback(*cb)
     else:
-        hlist = self._poll.poll (timeout)
+        hlist = self._poll.poll(timeout)
         for h in hlist:
-            __exec_callback (h[0], h[1])
+            __exec_callback(h[0], h[1])
     if self._checktimeout_inv > 0 and time.time() - self._last_checktimeout > self._checktimeout_inv:
-        self._check_timeout ()
+        self._check_timeout()
 
 
-def _connect_cb (self, sock, event):
-    event.ret = CoroConnection (sock)
+def _connect_cb(self, sock, event):
+    event.ret = CoroConnection(sock)
     event.ret.engine = self
     event.done = True
-    self.coroengine.resume_from_waitable (event)
+    self.coroengine.resume_from_waitable(event)
 
-def _connect_err_cb (self, error, event):
+def _connect_err_cb(self, error, event):
     event.error = error
     event.done = True
-    self.coroengine.resume_from_waitable (event)
+    self.coroengine.resume_from_waitable(event)
 
-def connect_coro (self, addr, syn_retry=None):
-    event = EngineEvent ()
-    self.connect_unblock (addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
+def connect_coro(self, addr, syn_retry=None):
+    event = EngineEvent()
+    self.connect_unblock(addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
     return event
 
-def _read_cb (self, conn, event):
+def _read_cb(self, conn, event):
     event.ret = conn.rd_buf
     event.error = conn.error
     event.done = True
-    self.coroengine.resume_from_waitable (event)
+    self.coroengine.resume_from_waitable(event)
 
-def _write_cb (self, conn, event):
+def _write_cb(self, conn, event):
     event.error = conn.error
     event.done = True
-    self.coroengine.resume_from_waitable (event)
+    self.coroengine.resume_from_waitable(event)
 
 
 
-def read_coro (self, conn, expect_len):
+def read_coro(self, conn, expect_len):
     """ 
         read fixed len data
         on timeout/error, err_cb will be called, the connection will be close afterward, 
     """
-    assert isinstance (conn, Connection)
+    assert isinstance(conn, Connection)
     assert expect_len > 0
-    ahead_len = len (conn.rd_ahead_buf)
-    event = EngineEvent ()
+    ahead_len = len(conn.rd_ahead_buf)
+    event = EngineEvent()
     if ahead_len:
         if conn.error is not None:
             event.error = conn.error
@@ -217,7 +217,7 @@ def read_coro (self, conn, expect_len):
     else:
         conn.rd_buf = ""
         conn.rd_expect_len = expect_len
-    if self._do_unblock_read (conn, self._read_cb, direct=True):
+    if self._do_unblock_read(conn, self._read_cb, direct=True):
         event.error = conn.error
         event.ret = conn.rd_buf
         event.done = True
@@ -227,15 +227,15 @@ def read_coro (self, conn, expect_len):
         conn.status_rd = ConnState.TOREAD
     return event
 
-def write_coro (self, conn, buf):
+def write_coro(self, conn, buf):
     """    NOTE: write only temporaryly register for write event, will not effect read
         """
-    assert isinstance (conn, Connection)
+    assert isinstance(conn, Connection)
     conn.wr_offset = 0
-    event = EngineEvent ()
-    if self._do_unblock_write (conn, buf, self._write_cb, direct=True):
+    event = EngineEvent()
+    if self._do_unblock_write(conn, buf, self._write_cb, direct=True):
         event.error = conn.error
-        event.ret = len (buf)
+        event.ret = len(buf)
         event.done = True
     else:
         conn.write_cb_args = (event, )
@@ -244,19 +244,19 @@ def write_coro (self, conn, buf):
 
     return event
 
-def readline_coro (self, conn, max_len):
+def readline_coro(self, conn, max_len):
     """ 
         read until '\n' is received or max_len is reached.
         if the line is longer than max_len, a Exception(line maxlength exceed) will be in conn.error which received by err_cb()
         on timeout/error, err_cb will be called, the connection will be close afterward, 
-        you must not do it yourself, any operation that will lock the server is forbident in err_cb ().
+        you must not do it yourself, any operation that will lock the server is forbident in err_cb().
         ok_cb/err_cb param: conn, *cb_args
         NOTE: when done, you have to watch_conn or remove_conn by yourself
         """
-    assert isinstance (conn, Connection)
+    assert isinstance(conn, Connection)
     conn.rd_buf = ""
-    event = EngineEvent ()
-    if self._do_unblock_readline (conn, self._read_cb, max_len, direct=True):
+    event = EngineEvent()
+    if self._do_unblock_readline(conn, self._read_cb, max_len, direct=True):
         event.error = conn.error
         event.ret = conn.rd_buf
         event.done = True
@@ -270,9 +270,9 @@ def readline_coro (self, conn, max_len):
 try:
     from socket_engine_ssl import SSLSocketEngine
 
-    def connect_ssl_coro (self, addr, syn_retry=None):
-        event = EngineEvent ()
-        SSLSocketEngine (self, addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
+    def connect_ssl_coro(self, addr, syn_retry=None):
+        event = EngineEvent()
+        SSLSocketEngine(self, addr, self._connect_cb, self._connect_err_cb, cb_args=(event, ), syn_retry=syn_retry)
         return event
     have_ssl = True
 except ImportError:
@@ -281,31 +281,31 @@ except ImportError:
 def _funcToMethod(func, clas, method_name=None):
     """ only works for old type class """
     import new
-    method = new.instancemethod (func, None, clas)
+    method = new.instancemethod(func, None, clas)
     if not method_name: method_name = func.__name__
     clas.__dict__[method_name] = method
 
 
 
-def _inject_class (cls):
-    _funcToMethod (connect_coro, cls)
-    _funcToMethod (read_coro, cls)
-    _funcToMethod (write_coro, cls)
-    _funcToMethod (readline_coro, cls)
-    _funcToMethod (run_coro, cls)
+def _inject_class(cls):
+    _funcToMethod(connect_coro, cls)
+    _funcToMethod(read_coro, cls)
+    _funcToMethod(write_coro, cls)
+    _funcToMethod(readline_coro, cls)
+    _funcToMethod(run_coro, cls)
 
-    _funcToMethod (_connect_cb, cls)
-    _funcToMethod (_connect_err_cb, cls)
-    _funcToMethod (poll, cls)
-    _funcToMethod (_exec_callback, cls)
-    _funcToMethod (_conn_callback, cls)
-    _funcToMethod (_read_cb, cls)
-    _funcToMethod (_write_cb, cls)
+    _funcToMethod(_connect_cb, cls)
+    _funcToMethod(_connect_err_cb, cls)
+    _funcToMethod(poll, cls)
+    _funcToMethod(_exec_callback, cls)
+    _funcToMethod(_conn_callback, cls)
+    _funcToMethod(_read_cb, cls)
+    _funcToMethod(_write_cb, cls)
 
-    if cls.__dict__.has_key ("connect_unblock_ssl"):
-        _funcToMethod (connect_ssl_coro, cls)
+    if cls.__dict__.has_key("connect_unblock_ssl"):
+        _funcToMethod(connect_ssl_coro, cls)
 
-_inject_class (CoroSocketEngine)
+_inject_class(CoroSocketEngine)
 
 
 # vim: tabstop=4 expandtab shiftwidth=4 softtabstop=4 :

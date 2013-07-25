@@ -15,8 +15,8 @@ import os
 import traceback
 #from lib.timecache import TimeCache
 
-data = "".join (["1234567890" for i in xrange (0, 10000)])
-global_lock = threading.Lock ()
+data = "".join(["1234567890" for i in xrange(0, 10000)])
+global_lock = threading.Lock()
 
 server_addr = ("0.0.0.0", 20300)
 g_round = 50000
@@ -25,153 +25,153 @@ g_send_count = 0
 g_client_num = 4
 g_done_client = 0
 
-#tc = TimeCache (0.5)
+#tc = TimeCache(0.5)
 
 
 
-def client ():
+def client():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     global g_send_count, g_client_num, g_done_client, server_addr, global_lock
     global data
     global g_round
-    sock.connect (server_addr)
-#        times = random.randint (1, 5000)
-#        time.sleep (times/ 2000.0)
-    for i in xrange (0, g_round):
-        send_all (sock, data)
-        _data = recv_all (sock, len(data))
+    sock.connect(server_addr)
+#        times = random.randint(1, 5000)
+#        time.sleep(times/ 2000.0)
+    for i in xrange(0, g_round):
+        send_all(sock, data)
+        _data = recv_all(sock, len(data))
         if _data == data:
-            global_lock.acquire ()
+            global_lock.acquire()
             g_send_count += 1
-            global_lock.release ()
+            global_lock.release()
         else:
             print "client recv invalid data"
-#            time.sleep (0.01)
+#            time.sleep(0.01)
     print "client done", g_done_client
-    sock.close ()
-    global_lock.acquire ()
+    sock.close()
+    global_lock.acquire()
     g_done_client += 1
-    global_lock.release ()
+    global_lock.release()
 
-def client_pool (pool):
+def client_pool(pool):
     global g_send_count, g_client_num, g_done_client, server_addr, global_lock
     global data
     global g_round
     conn = None
     try:
-        for i in xrange (0, g_round):
-            conn = pool.get_conn (server_addr)
+        for i in xrange(0, g_round):
+            conn = pool.get_conn(server_addr)
             if conn == None:
                 print "get_conn failed"
                 return
-            send_all (conn.sock, data)
-            _data = recv_all (conn.sock, len(data))
-            global_lock.acquire ()
+            send_all(conn.sock, data)
+            _data = recv_all(conn.sock, len(data))
+            global_lock.acquire()
             g_send_count += 1
-            global_lock.release ()
-            pool.put_back (conn)
-        global_lock.acquire ()
+            global_lock.release()
+            pool.put_back(conn)
+        global_lock.acquire()
         g_done_client += 1
-        global_lock.release ()
+        global_lock.release()
         print "client done", g_done_client
     except Exception, e:
-        getLogger ("client").exception_ex ("client: " + str (e))
-        print "client: ", str (e)
+        getLogger("client").exception_ex("client: " + str(e))
+        print "client: ", str(e)
         if conn:
-            pool.put_back (conn, True)
+            pool.put_back(conn, True)
             print "put_back conn , is_err=True"
         return
     
 
 
-def start_block_server ():
+def start_block_server():
     global server_addr
-    server = TCPSocketEngine (iopoll.Poll (), is_blocking=True, debug=False)
-    server.set_logger (getLogger ("server"))
+    server = TCPSocketEngine(iopoll.Poll(), is_blocking=True, debug=False)
+    server.set_logger(getLogger("server"))
 
-    def server_handler (conn):
+    def server_handler(conn):
         sock = conn.sock
         try:
-            _data = recv_all (sock, len (data))
-            send_all (sock, _data)
-            server.watch_conn (conn)
+            _data = recv_all(sock, len(data))
+            send_all(sock, _data)
+            server.watch_conn(conn)
         except Exception, e:
-            print "server handler", str (e)
-            getLogger ("server").exception (str (e))
-            server.close_conn (conn)
+            print "server handler", str(e)
+            getLogger("server").exception(str(e))
+            server.close_conn(conn)
             return False
 
-    server.listen_addr (server_addr, server_handler)
+    server.listen_addr(server_addr, server_handler)
 
-    def _run (server):
+    def _run(server):
         while True:
             try:
-                server.poll ()
+                server.poll()
             except Exception, e:
-                traceback.print_exc ()
-                os._exit (1)
+                traceback.print_exc()
+                os._exit(1)
         return
-    th = threading.Thread (target=_run, args=(server,))
-    th.setDaemon (1)
-    th.start ()
+    th = threading.Thread(target=_run, args=(server,))
+    th.setDaemon(1)
+    th.start()
     print "block server started"
     return server
     
 
-def start_unblock_server (poll=None):
+def start_unblock_server(poll=None):
     global server_addr
     if not poll:
         if 'EPoll' in dir(iopoll):
-            poll = iopoll.EPoll (True)
+            poll = iopoll.EPoll(True)
         else:
-            poll = iopoll.Poll ()
-    server = TCPSocketEngine (poll, is_blocking=False, debug=False)
-    server.set_logger (getLogger ("server"))
+            poll = iopoll.Poll()
+    server = TCPSocketEngine(poll, is_blocking=False, debug=False)
+    server.set_logger(getLogger("server"))
 #    server.get_time = tc.time
     
     print "starting unblock server with", str(poll)
-    def _on_recv (conn):
+    def _on_recv(conn):
         #print "on_recv"
-#        server.remove_conn (conn)
-        server.watch_conn (conn)
-        server.write_unblock (conn, conn.get_readbuf (), None, None)
+#        server.remove_conn(conn)
+        server.watch_conn(conn)
+        server.write_unblock(conn, conn.get_readbuf(), None, None)
         return
-    server.listen_addr (server_addr, server.read_unblock, (len(data), _on_recv, None))
+    server.listen_addr(server_addr, server.read_unblock, (len(data), _on_recv, None))
 
-    def _run (_server):
+    def _run(_server):
         while True:
             try:
-                _server.poll ()
+                _server.poll()
             except Exception, e:
-                traceback.print_exc ()
-                os._exit (1)
+                traceback.print_exc()
+                os._exit(1)
         return
-    th = threading.Thread (target=_run, args=(server,))
-    th.setDaemon (1)
-    th.start ()
+    th = threading.Thread(target=_run, args=(server,))
+    th.setDaemon(1)
+    th.start()
     return server
     
  
-def test_client ():
+def test_client():
     global g_send_count, g_done_client, g_client_num
-##    pool = ConnPool (10, -1)
+##    pool = ConnPool(10, -1)
     i = 0
-    ths = list ()
-    start_time = time.time ()
+    ths = list()
+    start_time = time.time()
     while True:
         if i < g_client_num:
-#            ths.append (threading.Thread (target=client_pool, args=(pool, )))
-            ths.append (threading.Thread (target=client, args=()))
+#            ths.append(threading.Thread(target=client_pool, args=(pool, )))
+            ths.append(threading.Thread(target=client, args=()))
             ths[i].setDaemon(1)
-            ths[i].start ()
+            ths[i].start()
             i += 1
         else:
-            for j in xrange (0, i):
-                ths[j].join ()
+            for j in xrange(0, i):
+                ths[j].join()
 
-            print "time:", time.time () - start_time
+            print "time:", time.time() - start_time
             print g_done_client, g_send_count
-#           pool.clear_conn (server_addr)
+#           pool.clear_conn(server_addr)
 
             if g_client_num == g_done_client:
                 print "test OK"
@@ -179,82 +179,82 @@ def test_client ():
                 print "test fail"
             return
 
-def test_client_unblock ():
+def test_client_unblock():
     poll = None
     if 'EPoll' in dir(iopoll):
-        poll = iopoll.EPoll (True)
+        poll = iopoll.EPoll(True)
         print "client using epoll et mode"
     else:
-        poll = iopoll.Poll ()
-    engine = TCPSocketEngine (poll, debug=False)
+        poll = iopoll.Poll()
+    engine = TCPSocketEngine(poll, debug=False)
 #    engine.get_time = tc.time
-    engine.set_logger (getLogger ("client"))
-    start_time = time.time ()
-    def __on_conn_err (e, client_id):
+    engine.set_logger(getLogger("client"))
+    start_time = time.time()
+    def __on_conn_err(e, client_id):
         print client_id, "connect error", str(e)
-        os._exit (1)
+        os._exit(1)
         return
-    def __on_err (conn, client_id, count):
+    def __on_err(conn, client_id, count):
         print client_id, "error", str(conn.error), count
         return
-    def __on_recv (conn, client_id, count):
+    def __on_recv(conn, client_id, count):
         global g_done_client
         if count >= 0:
-            buf = conn.get_readbuf ()
+            buf = conn.get_readbuf()
             if buf != data:
                 print "data recv invalid, client:%s, count:%s, data:[%s]" % (client_id, count, buf)
-                os._exit (0)
+                os._exit(0)
         if count < g_round:
             #print client_id, count
-            #engine.remove_conn (conn)
-            engine.write_unblock (conn, data, __on_send, __on_err, (client_id, count + 1))
+            #engine.remove_conn(conn)
+            engine.write_unblock(conn, data, __on_send, __on_err, (client_id, count + 1))
         else:
-            engine.close_conn (conn)
+            engine.close_conn(conn)
             g_done_client += 1
             print "client", client_id, "done"
             if g_done_client == g_client_num:
                 print "test client done time: ", time.time() - start_time
-                os._exit (0)
+                os._exit(0)
         return
-    def __on_send ( conn, client_id, count):
+    def __on_send( conn, client_id, count):
 #        print "send", client_id, count, time.time()
-        engine.read_unblock (conn, len(data), __on_recv, __on_err, (client_id, count))
+        engine.read_unblock(conn, len(data), __on_recv, __on_err, (client_id, count))
         return
-    def __on_conn (sock, client_id):
+    def __on_conn(sock, client_id):
 #        print "conn", client_id, time.time()
-        __on_recv (Connection (sock), client_id, -1)
+        __on_recv(Connection(sock), client_id, -1)
         return
-    def _run (engine):
+    def _run(engine):
         global g_done_client
         while g_done_client < g_client_num:
             try:
-                engine.poll ()
+                engine.poll()
             except Exception, e:
-                traceback.print_exc ()
-                os._exit (1)
+                traceback.print_exc()
+                os._exit(1)
         print g_done_client
         return
     print "client_unblock started"
-    for i in xrange (0, g_client_num):
+    for i in xrange(0, g_client_num):
 #        print "conning", i
-        engine.connect_unblock (server_addr, __on_conn, __on_conn_err, (i,))
-    _run (engine)  
+        engine.connect_unblock(server_addr, __on_conn, __on_conn_err, (i,))
+    _run(engine)  
 
 
-def main ():
-    Log ("client", config=conf)
-    Log ("server", config=conf)
-    server = start_unblock_server ()
-#    server = start_block_server ()
-    time.sleep (1)
-    test_client ()
-#    test_client_unblock ()
+def main():
+    Log("client", config=conf)
+    Log("server", config=conf)
+    server = start_unblock_server()
+#    server = start_block_server()
+    time.sleep(1)
+    test_client()
+#    test_client_unblock()
 
 
 if __name__ == '__main__':
 #    import yappi
 #    yappi.start()
-    main ()
+    main()
 #    stats = yappi.get_stats()
 #    for stat in stats:
 #        print stat

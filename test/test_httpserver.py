@@ -17,30 +17,30 @@ import threading
 
 
 
-class HTTPHandler (baseHTTPHandler):
+class HTTPHandler(baseHTTPHandler):
     
-    def __init__ (self, engine, logger):
-        baseHTTPHandler.__init__ (self, engine)
+    def __init__(self, engine, logger):
+        baseHTTPHandler.__init__(self, engine)
         self.logger = logger
 
-    def handle_HEAD (self, client):
-        self.process (client, is_head=True)
+    def handle_HEAD(self, client):
+        self.process(client, is_head=True)
 
-    def handle_GET (self, client):
-        self.process (client, is_head=False)
+    def handle_GET(self, client):
+        self.process(client, is_head=False)
 
-    def handle_access (self, client):
+    def handle_access(self, client):
         msg = '%s - "%s %s %s" %s %s' % (client.conn.peer[0], client.command, 
                 client.path, client.request_version, 
                 client.response_code, client.content_length)
-        self.logger.info (msg)
+        self.logger.info(msg)
 
 
-    def handle_error (self, client):
+    def handle_error(self, client):
         msg = '%s - "%s %s %s" %s' % (client.conn.peer[0], client.command,
                 client.path, client.request_version, 
                 client.conn.error)
-        self.logger.error (msg)
+        self.logger.error(msg)
 
 
     def translate_path(self, path):
@@ -57,25 +57,25 @@ class HTTPHandler (baseHTTPHandler):
         path = posixpath.normpath(urllib.unquote(path))
         words = path.split('/')
         words = filter(None, words)
-        path = os.getcwd ()
+        path = os.getcwd()
         for word in words:
             drive, word = os.path.splitdrive(word)
             head, word = os.path.split(word)
-            if word in (os.curdir, os.pardir): continue
+            if word in(os.curdir, os.pardir): continue
             path = os.path.join(path, word)
         return path
 
-    def process (self, client, is_head=False):
+    def process(self, client, is_head=False):
         """Common code for GET and HEAD commands.
         return values: 
             code, msg, headers, file
         """
-        path = self.translate_path (client.path)
+        path = self.translate_path(client.path)
         f = None
         if os.path.isdir(path):
             if not client.path.endswith('/'):
                 # redirect browser - doing basically what apache does
-                self.send_response (client, 300, headers=(('Location', client.path + "/"),))
+                self.send_response(client, 300, headers=(('Location', client.path + "/"),))
                 return
             for index in "index.html", "index.htm":
                 index = os.path.join(path, index)
@@ -84,20 +84,20 @@ class HTTPHandler (baseHTTPHandler):
                     break
             else:
                 try:
-                    f = self.list_directory (client, path)
+                    f = self.list_directory(client, path)
                 except IOError, e:
-                    return self.send_error (client, 401, "No permission to list directory")
-                length = f.tell ()
-                f.seek (0)
+                    return self.send_error(client, 401, "No permission to list directory")
+                length = f.tell()
+                f.seek(0)
                 if is_head:
                     headers = (
                         ('Content-type', 'text/html'),
                         ('Content-Length', str(length)),
                         ) 
-                    self.send_response (client, 200, headers)
+                    self.send_response(client, 200, headers)
                 else:
-                    self.send_response_content (client, "text/html", f.getvalue ())
-                f.close ()
+                    self.send_response_content(client, "text/html", f.getvalue())
+                f.close()
                 return
         ctype = self.guess_type(path)
         try:
@@ -106,26 +106,26 @@ class HTTPHandler (baseHTTPHandler):
             # transmitted *less* than the content-length!
             f = open(path, 'rb')
         except IOError:
-            self.send_error (client, 404, "File not found")
+            self.send_error(client, 404, "File not found")
             return
         fs = os.fstat(f.fileno())
         size = str(fs[6])
         headers = (
                     ('Content-type', ctype),
                     ('Content-Length', size),
-                    ('Last_Modified', self.date_time_string (fs.st_mtime)),
+                    ('Last_Modified', self.date_time_string(fs.st_mtime)),
                     )
         if is_head:
-            f.close ()
-            self.send_response (client, 200, headers)
+            f.close()
+            self.send_response(client, 200, headers)
         else:
-            self.send_response_file (client, f, headers)
+            self.send_response_file(client, f, headers)
 
 
     def list_directory(self, client, path):
-        """Helper to produce a directory listing (absent index.html).
+        """Helper to produce a directory listing(absent index.html).
 
-        Return value is either a file object, or None (indicating an
+        Return value is either a file object, or None(indicating an
         error).  In either case, the headers are sent, making the
         interface the same as for send_head().
 
@@ -157,14 +157,14 @@ class HTTPHandler (baseHTTPHandler):
     def guess_type(self, path):
         """Guess the type of a file.
 
-        Argument is a PATH (a filename).
+        Argument is a PATH(a filename).
 
         Return value is a string of the form type/subtype,
         usable for a MIME Content-type header.
 
         The default implementation looks the file's extension
         up in the table self.extensions_map, using application/octet-stream
-        as a default; however it would be permissible (if
+        as a default; however it would be permissible(if
         slow) to look inside the data to make a better guess.
 
         """
@@ -188,27 +188,27 @@ class HTTPHandler (baseHTTPHandler):
         '.h': 'text/plain',
         })
 
-def start_http_server (logger, ip, port):
-    engine = TCPSocketEngine (iopoll.EPoll ())
-    engine.set_logger (logger)
-    engine.set_timeout (idle_timeout=0, rw_timeout=5)
-    handler = HTTPHandler (engine, logger)
-    handler.start ((ip, port))
-    def _run ():
+def start_http_server(logger, ip, port):
+    engine = TCPSocketEngine(iopoll.EPoll())
+    engine.set_logger(logger)
+    engine.set_timeout(idle_timeout=0, rw_timeout=5)
+    handler = HTTPHandler(engine, logger)
+    handler.start((ip, port))
+    def _run():
         print "server started"
         while True:
             try:
-                engine.poll ()
+                engine.poll()
             except Exception, e:
-                traceback.print_exc ()
-                os._exit (1)
+                traceback.print_exc()
+                os._exit(1)
                 return
-    _run ()
+    _run()
 
 if __name__ == '__main__':
     
-    logger = Log ("main")
-    start_http_server (logger, "0.0.0.0", 8088)
+    logger = Log("main")
+    start_http_server(logger, "0.0.0.0", 8088)
 
 
 
