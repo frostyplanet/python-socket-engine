@@ -33,57 +33,57 @@ DEFAULT_ERROR_CONTENT_TYPE = "text/html"
 def _quote_html(html):
     return html.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-class InvalidHeader (Exception):
+class InvalidHeader(Exception):
     pass
 
-class Rfc822Headers (object):
+class Rfc822Headers(object):
 
     headers = None
 
-    def __init__ (self):
-        self.headers = dict ()
+    def __init__(self):
+        self.headers = dict()
     
-    def add_header (self, name, val):
+    def add_header(self, name, val):
         self.headers[name] = val
 
-    def get (self, name, default=None):
-        return self.headers.get (name, default)
+    def get(self, name, default=None):
+        return self.headers.get(name, default)
 
-    def pack (self):
-        lines = map (lambda x: "%s: %s" % (x[0], x[1]), self.headers.items ())
-        buf = "\r\n".join (lines)
+    def pack(self):
+        lines = map(lambda x: "%s: %s" % (x[0], x[1]), self.headers.items())
+        buf = "\r\n".join(lines)
         if lines:
             buf += "\r\n"
         return buf
 
-    def unpack (self, lines):
+    def unpack(self, lines):
         for line in lines:
-            arr = line.split (":")
+            arr = line.split(":")
             if len(arr) < 2:
-                raise InvalidHeader ()
+                raise InvalidHeader()
             name = arr[0]
-            val = "".join (arr[1:])
-            self.add_header (name, self.unpack_field_value (val))
+            val = "".join(arr[1:])
+            self.add_header(name, self.unpack_field_value(val))
  
-    def unpack_field_value (s):
-        s = s.strip ()
+    def unpack_field_value(s):
+        s = s.strip()
         #TODO
-        #p = s.index ("(")
+        #p = s.index("(")
         return s
-    unpack_field_value = staticmethod (unpack_field_value)
+    unpack_field_value = staticmethod(unpack_field_value)
 
-    def __str__ (self):
-        lines = map (lambda x: x[0] + ":" + x[1] , self.headers.items ())
-        return "\n".join (lines)
+    def __str__(self):
+        lines = map(lambda x: x[0] + ":" + x[1] , self.headers.items())
+        return "\n".join(lines)
 
 
-class ClientInfo (object):
+class ClientInfo(object):
     __slots__ = 'conn', 'command', 'path', 'request_version', \
             'close_connection', 'headers', 'temp', \
             'response_code', 'content_length'
 
 
-class baseHTTPHandler (object):
+class baseHTTPHandler(object):
 
     LINE_MAX_LENGTH = 10240
     error_message_format = DEFAULT_ERROR_MESSAGE
@@ -104,133 +104,133 @@ class baseHTTPHandler (object):
     engine = None
 
 
-    def __init__ (self, socket_engine):
+    def __init__(self, socket_engine):
         self.engine = socket_engine
         self.passive_sock = None
 
-    def start (self, addr):
-        self.passive_sock = self.engine.listen_addr (addr, readable_cb=None, new_conn_cb=self._accept_client, is_blocking=False)
+    def start(self, addr):
+        self.passive_sock = self.engine.listen_addr(addr, readable_cb=None, new_conn_cb=self._accept_client, is_blocking=False)
 
-    def stop (self):
+    def stop(self):
         if self.passive_sock:
-            self.engine.unlisten (self.passive_sock)
+            self.engine.unlisten(self.passive_sock)
 
-    def handle_GET (self, client):
+    def handle_GET(self, client):
         raise NotImplementedError
 
-    def handle_HEAD (self, client):
+    def handle_HEAD(self, client):
         raise NotImplementedError
 
-    def handle_POST (self, client):
+    def handle_POST(self, client):
         raise NotImplementedError
 
-    def handle_idle (self, client):
+    def handle_idle(self, client):
         pass
 
-    def handle_access (self, client):
+    def handle_access(self, client):
         """ override this with your logging function, called before sending response"""
         pass
 
-    def handle_closing (self, client):
+    def handle_closing(self, client):
         """ override this with your logging function, called after sent response"""
         pass
 
-    def handle_error (self, client, e):
+    def handle_error(self, client, e):
         """ override this with your logging function"""
         pass
 
-    def send_response_ex (self, client, code, ok_cb, headers=(), cb_args=(), header_finished=True):
-        buf = self._make_response (client, code, None, headers)
+    def send_response_ex(self, client, code, ok_cb, headers=(), cb_args=(), header_finished=True):
+        buf = self._make_response(client, code, None, headers)
         if header_finished:
             buf += "\r\n"
-        self.handle_access (client)
-        self.engine.write_unblock (client.conn, buf, ok_cb, self._handle_error, (client, ) + cb_args)
+        self.handle_access(client)
+        self.engine.write_unblock(client.conn, buf, ok_cb, self._handle_error, (client, ) + cb_args)
 
-    def send_response (self, client, code, headers=()):
-        self.send_response_ex (client, code, self._close_client, headers=headers)
+    def send_response(self, client, code, headers=()):
+        self.send_response_ex(client, code, self._close_client, headers=headers)
 
-    def _send_file (self, conn, client, f):
+    def _send_file(self, conn, client, f):
         buf = None
         try:
-            buf = f.read (1024)
+            buf = f.read(1024)
         except IOError, e:
-            f.close ()
-            self.handle_error (client, e)
+            f.close()
+            self.handle_error(client, e)
             return
         if buf:
             self.engine.write_unblock  (client.conn, buf, self._send_file, self._handle_error, cb_args=(client, f))
         else:
-            f.close ()
-            self._close_client (conn, client)
+            f.close()
+            self._close_client(conn, client)
 
-    def send_response_file (self, client, f, headers=()):
-        self.send_response_ex (client, 200, self._send_file, headers=headers, cb_args=(f,))
+    def send_response_file(self, client, f, headers=()):
+        self.send_response_ex(client, 200, self._send_file, headers=headers, cb_args=(f,))
 
-    def send_response_content (self, client, mime_type, text, headers=()):
+    def send_response_content(self, client, mime_type, text, headers=()):
         headers += (('Content-type', mime_type), 
-                    ('Content-Length', len (text)),
+                    ('Content-Length', len(text)),
                     )
-        buf = self._make_response (client, 200, None, headers)
+        buf = self._make_response(client, 200, None, headers)
         buf += "\r\n"
         buf += text
-        self.handle_access (client)
-        self.engine.write_unblock (client.conn, buf, self._close_client, self._handle_error, (client, ))
+        self.handle_access(client)
+        self.engine.write_unblock(client.conn, buf, self._close_client, self._handle_error, (client, ))
 
         
-    def send_error (self, client, code, msg=None):
+    def send_error(self, client, code, msg=None):
         conn = client.conn
-        buf = self._make_response (client, code, msg, (
+        buf = self._make_response(client, code, msg, (
             ('Content-Type', self.error_content_type),
             ('Connection', 'close'),
             ))
         buf += "\r\n"
-        if client.command != 'HEAD' and code >= 200 and code not in (204, 304):
-            s, explain = self.responses.get (code, ("???", "???"))
+        if client.command != 'HEAD' and code >= 200 and code not in(204, 304):
+            s, explain = self.responses.get(code, ("???", "???"))
             if msg is None:
                 msg = s
             content = (self.error_message_format %
                        {'code': code, 'message': _quote_html(msg), 'explain': explain})
             buf += content 
 
-        self.handle_access (client)
-        self.engine.write_unblock (conn, buf, self._close_client, self._handle_error, cb_args=(client,))
+        self.handle_access(client)
+        self.engine.write_unblock(conn, buf, self._close_client, self._handle_error, cb_args=(client,))
 
 
-    def _accept_client (self, sock):
-        client = ClientInfo ()
-        self.engine.put_sock (sock, readable_cb=self._handle_client, readable_cb_args=(client,),
+    def _accept_client(self, sock):
+        client = ClientInfo()
+        self.engine.put_sock(sock, readable_cb=self._handle_client, readable_cb_args=(client,),
                 idle_timeout_cb=self._handle_idle)
         return None
 
-    def _handle_idle (self, conn, client):
-        self.handle_idle (client)
+    def _handle_idle(self, conn, client):
+        self.handle_idle(client)
 
-    def _handle_client (self, conn, client):
+    def _handle_client(self, conn, client):
         client.conn = conn
-        self.engine.readline_unblock (conn, self.LINE_MAX_LENGTH, self._read_request, None, (client,)) 
+        self.engine.readline_unblock(conn, self.LINE_MAX_LENGTH, self._read_request, None, (client,)) 
 
-    def _handle_error (self, conn, client, *args):
-        self.handle_error (client, conn.error)
+    def _handle_error(self, conn, client, *args):
+        self.handle_error(client, conn.error)
 
-    def _close_client (self, conn, client, *args):
-        self.handle_closing (client)
+    def _close_client(self, conn, client, *args):
+        self.handle_closing(client)
         if client.close_connection:
-            self.engine.close_conn (client.conn)
+            self.engine.close_conn(client.conn)
         else:
-            self.engine.watch_conn (client.conn)
+            self.engine.watch_conn(client.conn)
 
-    def _read_request (self, conn, client):
+    def _read_request(self, conn, client):
         client.close_connection = 1
-        line = conn.get_readbuf ()
+        line = conn.get_readbuf()
         if line[-2:] == '\r\n':
             line = line[:-2]
         elif line[-1:] == '\n':
             line = line[:-1]
-        words = line.split ()
-        if len (words) == 3:
+        words = line.split()
+        if len(words) == 3:
             [command, path, version] = words
             if version[:5] != 'HTTP/':
-                self.send_error(client, 400, "Bad request version (%r)" % version)
+                self.send_error(client, 400, "Bad request version(%r)" % version)
                 return False
             try:
                 base_version_number = version.split('/', 1)[1]
@@ -244,80 +244,80 @@ class baseHTTPHandler (object):
                 if len(version_number) != 2:
                     raise ValueError
                 version_number = int(version_number[0]), int(version_number[1])
-            except (ValueError, IndexError):
-                self.send_error(client, 400, "Bad request version (%r)" % version)
+            except(ValueError, IndexError):
+                self.send_error(client, 400, "Bad request version(%r)" % version)
                 return False
             if version_number >= (1, 1) and self.protocol_version >= "HTTP/1.1":
                 client.close_connection = 0
             if version_number >= (2, 0):
                 self.send_error(client, 505,
-                          "Invalid HTTP Version (%s)" % base_version_number)
+                          "Invalid HTTP Version(%s)" % base_version_number)
                 return False
         elif len(words) == 2:
             [command, path] = words
             client.close_connection = 1
             if command != 'GET':
                 self.send_error(client, 400,
-                                "Bad HTTP/0.9 request type (%r)" % command)
+                                "Bad HTTP/0.9 request type(%r)" % command)
                 return False
         elif not words:
             return False
         else:
-            self.send_error(client, 400, "Bad request syntax (%r)" % line)
+            self.send_error(client, 400, "Bad request syntax(%r)" % line)
             return False
         client.command, client.path, client.request_version = command, path, version
 
         client.headers = []
-        self.engine.readline_unblock (conn, self.LINE_MAX_LENGTH, self._read_header, None, (client,))
+        self.engine.readline_unblock(conn, self.LINE_MAX_LENGTH, self._read_header, None, (client,))
 #        return True
 
-    def _read_header (self, conn, client):
+    def _read_header(self, conn, client):
         """ read the rfc 822 msg header """
-        line = conn.get_readbuf ()
-        line = line.strip ('\r\n')
+        line = conn.get_readbuf()
+        line = line.strip('\r\n')
         if line == '':
             #process header
-            _headers = Rfc822Headers ()
+            _headers = Rfc822Headers()
             try:
-                _headers.unpack (client.headers)
+                _headers.unpack(client.headers)
             except InvalidHeader:
                 self.send_error(client, 400, "invalid header")
                 return
             client.headers = _headers
-            self._proc_request (client)
+            self._proc_request(client)
             return
         if line[0] in [' ', '\t']: # continue line
-            if len (client.headers) == 0:
-                self.send_error(client, 400, "Bad request syntax (%r)" % line)
+            if len(client.headers) == 0:
+                self.send_error(client, 400, "Bad request syntax(%r)" % line)
                 return
             client.headers[-1] += line
         else:
-            client.headers.append (line)
-        self.engine.readline_unblock (conn, self.LINE_MAX_LENGTH, self._read_header, None, (client,))
+            client.headers.append(line)
+        self.engine.readline_unblock(conn, self.LINE_MAX_LENGTH, self._read_header, None, (client,))
 
 
-    def _proc_request (self, client):
+    def _proc_request(self, client):
         conntype = client.headers.get('Connection', "")
         if conntype.lower() == 'close':
             client.close_connection = 1
-        elif (conntype.lower() == 'keep-alive' and
+        elif(conntype.lower() == 'keep-alive' and
                 self.protocol_version >= "HTTP/1.1"):
             client.close_connection = 0
 
         try:
             if client.command == 'GET':
-                self.handle_GET (client)
+                self.handle_GET(client)
             elif client.command == 'POST':
-                self.handle_POST (client)
+                self.handle_POST(client)
             elif client.command == 'HEAD':
-                self.handle_HEAD (client)
+                self.handle_HEAD(client)
             else:
                 raise NotImplementedError
         except NotImplementedError:
-            self.send_error (client, 501, "Unsupported method (%s)" % client.command)
+            self.send_error(client, 501, "Unsupported method(%s)" % client.command)
 
 
-    def _make_response (self, client, code, msg=None, headers=()):
+    def _make_response(self, client, code, msg=None, headers=()):
         if msg is None:
             if code in self.responses:
                 msg = self.responses[code][0]
@@ -326,14 +326,14 @@ class baseHTTPHandler (object):
         buf = ""
         if client.request_version != 'HTTP/0.9':
             buf += "%s %d %s\r\n" % (self.protocol_version, code, msg)
-            header = Rfc822Headers ()
-            header.add_header ('Server', self.version_string ())
-            header.add_header ('Date', self.date_time_string ())
+            header = Rfc822Headers()
+            header.add_header('Server', self.version_string())
+            header.add_header('Date', self.date_time_string())
             for h in headers:
-                header.add_header (*h)
-            buf += header.pack ()
+                header.add_header(*h)
+            buf += header.pack()
         client.response_code = code
-        client.content_length = header.get ('Content-Length', '-')
+        client.content_length = header.get('Content-Length', '-')
         return buf
 
 
